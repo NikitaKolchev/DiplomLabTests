@@ -1,178 +1,172 @@
-# BMZ Lab Tests System
+# BMZ Lab Tests System: Комплексная Документация Системы
 
-Backend foundation for the laboratory testing registration system.
+## 1. Введение и Назначение Системы
+Информационная система **BMZ Lab Tests System** разработана специально для нужд ОТК и центральной заводской лаборатории металлургического предприятия (БМЗ). Основная цель системы — полная цифровизация процесса контроля качества металлопродукции, исключение человеческого фактора при принятии решения о годности продукции и обеспечение прослеживаемости результатов испытаний.
 
-## Stack
-
-- ASP.NET Core Web API
-- Entity Framework Core (Code First)
-- SQL Server
-- LDAP + JWT authentication
-
-## Solution structure
-
-- `src/Bmz.LabTests.Domain` - entities and core domain models
-- `src/Bmz.LabTests.Application` - use-case services + abstractions (repositories/interfaces)
-- `src/Bmz.LabTests.Infrastructure` - EF Core repositories, LDAP, JWT, seed
-- `src/Bmz.LabTests.API` - Web API host and controllers
-
-## Implemented in current iteration
-
-- Clean Architecture skeleton with 4 projects.
-- Controllers are thin: business logic moved to Application services.
-- Repository layer added between API/Application and EF Core.
-- Domain entities for users, dictionaries, testing protocol, limits, results.
-- `RowVersion` concurrency field on all entities.
-- EF Core model configuration and SQL Server context.
-- Initial migration and automatic startup migration apply.
-- Seed data:
-  - Roles: `Admin`, `Engineer`, `Assistant`
-  - Countries: Belarus/Russia/Kazakhstan
-  - Local fallback user: `local-admin` / `VeryHardPassword`
-- LDAP auth service + fallback local admin auth.
-- JWT generation with role claims.
-- `POST /api/auth/login` endpoint with FluentValidation.
-- Administrative/engineering module APIs:
-  - `Countries` CRUD
-  - `Customers` CRUD
-  - `WireCodes` CRUD
-  - `Parameters` CRUD
-  - `PUT/GET /api/wire-codes/{wireCodeId}/limits` for protocol assembly
-    (required parameters + min/max intervals)
-- Organization and role management:
-  - Admin:
-    - create engineers (`POST /api/admin/users/engineers`)
-    - create assistants (`POST /api/admin/users/assistants`)
-    - create laboratories (`POST /api/admin/laboratories`)
-    - assign engineer to laboratory (`PUT /api/admin/laboratories/{id}/engineer`)
-    - view laboratories and engineers (`GET /api/admin/laboratories`, `GET /api/admin/users/engineers`)
-  - Engineer:
-    - create own assistants (`POST /api/engineer/users/assistants`)
-    - list/filter assistants (`GET /api/engineer/users/assistants?search=&login=`)
-    - edit assistants (`PUT /api/engineer/users/assistants/{id}`)
-- Laboratory data isolation:
-  - assistants can create/save/complete only their own laboratory tests
-  - assistants see only tests of their laboratory in test-results journal
-- Audit:
-  - logs for laboratory create/engineer assignment
-  - logs for user create/update in organization flows
-  - logs for limits updates
-- Laboratory workstation APIs:
-  - `GET /api/wire-codes/{wireCodeId}/input-fields` dynamic input schema for selected wire code
-  - `POST /api/test-results` create protocol header
-  - `GET /api/test-results/{id}` protocol details with values
-  - `GET /api/test-results` list with filtering/search
-  - `PUT /api/test-results/{id}/values` save values with row-version check
-  - `POST /api/test-results/{id}/complete` finalize with validation and auto route:
-    - accepted -> `FinalProducts`
-    - rejected -> `Rejects`
-  - `409 Conflict` on optimistic concurrency mismatch
-- Reporting APIs:
-  - `GET /api/reports/monthly-journal?year=YYYY&month=MM` -> Excel via ClosedXML
-  - `GET /api/reports/test-results/{id}/certificate` -> PDF via QuestPDF
-- Frontend skeleton (`frontend`):
-  - React + TypeScript + Ant Design + React Router
-  - Login page and JWT storage
-  - Protected routes by roles
-  - Test results table with filtering/search
-  - Excel/PDF export actions wired to API
-  - Laboratory workstation page:
-    - create protocol
-    - dynamic fields by selected wire code
-    - save values with row-version token
-    - complete protocol with accept/reject result
-  - Admin dictionaries page:
-    - CRUD for countries/customers/wire codes/parameters
-    - protocol assembly (required flags + limits per wire code)
-
-## Как запустить приложение полностью
-
-### Требования
-
-- **.NET SDK 10** (или 8/9 — тогда смените `TargetFramework` в `.csproj`).
-- **SQL Server** или **LocalDB** (обычно идёт с Visual Studio / Build Tools).
-- **Node.js 18+** (LTS) — для фронтенда.
-
-### 1. База данных
-
-По умолчанию используется LocalDB и строка в `appsettings.Development.json`:
-
-```
-Server=(localdb)\mssqllocaldb;Database=BmzLabTestsDbDev;Trusted_Connection=True;TrustServerCertificate=True
-```
-
-Если используете полный SQL Server — замените на свою строку в `appsettings.Development.json` (секция `ConnectionStrings.DefaultConnection`).
-
-### 2. Запуск backend (API)
-
-В корне репозитория:
-
-```bash
-dotnet build Bmz.LabTests.slnx
-dotnet run --project src/Bmz.LabTests.API/Bmz.LabTests.API.csproj
-```
-
-При старте выполняются миграции и seed (роли, страны, локальный админ).  
-API слушает адреса:
-
-- **HTTPS:** https://localhost:7045  
-- **HTTP:** http://localhost:5287  
-
-По умолчанию фронтенд настроен на **http://localhost:5287/api**, поэтому не зависит от dev HTTPS-сертификата.  
-Если хотите работать через HTTPS, установите переменную окружения:
-
-```bash
-VITE_API_BASE_URL=https://localhost:7045/api
-```
-
-Swagger/OpenAPI (если включён): https://localhost:7045/openapi/v1.json  
-
-### 3. Запуск frontend
-
-В **другом** терминале, из корня репозитория:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Если при `npm run dev` появляется ошибка «vite не является внутренней или внешней командой» — убедитесь, что вы выполнили `npm install` в папке `frontend` (должна появиться папка `node_modules`). Затем снова запустите `npm run dev`. В скриптах используется `npx vite`, чтобы запускать локально установленный Vite.
-
-Фронтенд откроется по адресу **http://localhost:5173**.  
-Он обращается к API по умолчанию по адресу **http://localhost:5287/api** (настроено в `frontend/src/api/http.ts`).  
-Если API на другом адресе — задайте переменную окружения `VITE_API_BASE_URL`.
-
-### 4. Вход в систему
-
-После открытия http://localhost:5173:
-
-- **Логин:** `local-admin`
-- **Пароль:** `VeryHardPassword`
-
-Роль — Admin (доступ ко всем разделам: журнал, рабочее место лаборанта, отчёты, справочники).  
-Пароль локального админа можно сменить только в коде/БД (seed в `Infrastructure/Persistence/SeedData.cs`).
-
-### 5. Если API на другом хосте/порту
-
-- В **backend**: в `Properties/launchSettings.json` в профиле `https` измените `applicationUrl`.
-- Во **frontend**: задайте `VITE_API_BASE_URL` (например `https://localhost:7078/api`).
-
-### 6. CORS и HTTPS
-
-Для разработки CORS в API настроен разрешающе (`SetIsOriginAllowed(_ => true)`).  
-При первом открытии https://localhost:7045 браузер может потребовать подтверждение самоподписанного сертификата — примите его для localhost.
+### Бизнес-цели:
+1.  **Автоматизация контроля**: Мгновенная проверка соответствия физико-механических свойств продукции государственным и международным стандартам.
+2.  **Централизация данных**: Хранение всех протоколов испытаний в единой защищенной базе данных с быстрым доступом.
+3.  **Сокращение брака**: Оперативное выявление отклонений в технологическом процессе на основе статистики испытаний.
+4.  **Юридическая значимость**: Формирование неизменяемых PDF-сертификатов качества для конечных потребителей.
 
 ---
 
-## Run (кратко)
+## 2. Архитектура Решения
 
-1. При необходимости измените строку подключения и JWT в `appsettings.Development.json`.
-2. Запуск API: `dotnet run --project src/Bmz.LabTests.API/Bmz.LabTests.API.csproj`
-3. Запуск фронтенда: `cd frontend` → `npm install` → `npm run dev`
-4. В браузере: http://localhost:5173, логин `local-admin`, пароль `VeryHardPassword`
+### 2.1 Backend: Clean Architecture (Чистая Архитектура)
+Проект разделен на четыре логических уровня, что соответствует лучшим практикам разработки на платформе .NET:
 
-## Notes
+*   **Bmz.LabTests.Domain (Ядро)**:
+    *   Содержит только бизнес-сущности (`User`, `TestResult`, `WireCode`, `Parameter` и др.).
+    *   Определяет базовые интерфейсы и константы.
+    *   Не имеет внешних зависимостей.
+    *   Использует `RowVersion` (Timestamp) для реализации механизмов оптимистической блокировки.
 
-- Current environment has .NET SDK 10 template defaults (`net10.0` target). If you need strict `.NET 8/9`, install matching SDK and retarget projects.
-- Node.js is currently missing in this environment, so frontend build/dev commands were not executed yet.
+*   **Bmz.LabTests.Application (Бизнес-логика)**:
+    *   Реализует сценарии использования (Use Cases).
+    *   Содержит DTO (Data Transfer Objects) для обмена данными.
+    *   Использует библиотеку **FluentValidation** для строгой проверки входящих данных.
+    *   Управляет транзакциями и взаимодействует с репозиториями через интерфейсы.
+
+*   **Bmz.LabTests.Infrastructure (Инфраструктура)**:
+    *   Реализация доступа к БД через **Entity Framework Core**.
+    *   Интеграция с внешними сервисами (LDAP для авторизации сотрудников предприятия).
+    *   Генерация документов: **QuestPDF** для сложных сертификатов и **ClosedXML** для Excel-отчетов.
+    *   Механизмы инициализации БД (Seeding).
+
+*   **Bmz.LabTests.API (Интерфейс)**:
+    *   REST-контроллеры, обеспечивающие взаимодействие с фронтендом.
+    *   Настройка Middleware (обработка исключений, аутентификация JWT, CORS).
+    *   Swagger/OpenAPI документация для разработчиков.
+
+### 2.2 Frontend: Современный SPA
+*   **Стек**: React 18 + TypeScript + Vite.
+*   **UI-фреймворк**: Ant Design (промышленный стандарт для корпоративных систем).
+*   **Управление состоянием**: React Hooks + Context API.
+*   **Стилизация**: CSS-in-JS (через Ant Design) для динамических тем.
+
+---
+
+## 3. Подробная Структура Проекта
+
+### 📂 Backend (src/)
+- **Bmz.LabTests.Domain**: 
+    - `Entities/`: Сущности БД (User, TestResult, Laboratory).
+    - `Common/`: Базовые классы (Entity, Specification, Result).
+    - `Enums/`: Перечисления (TestResultStatus, ParameterDataType).
+- **Bmz.LabTests.Application**:
+    - `Abstractions/`: Интерфейсы репозиториев, почты, отчетов.
+    - `TestResults/`, `Organization/`, `WireCodes/`: Сервисы, логика и DTO по модулям.
+    - `Validators/`: Правила валидации запросов.
+- **Bmz.LabTests.Infrastructure**:
+    - `Persistence/`: Контекст БД, конфигурации сущностей (Fluent API), миграции.
+    - `Repositories/`: Реализация доступа к данным.
+    - `Auth/`: Реализация JWT и LDAP.
+    - `Reporting/`: Логика генерации PDF и Excel.
+- **Bmz.LabTests.API**:
+    - `Controllers/`: Точки входа API.
+    - `Middlewares/`: Обработка ошибок и логирование.
+
+### 📂 Frontend (frontend/)
+- `src/api/`: Настройка Axios и перехватчиков токенов.
+- `src/auth/`: Контекст авторизации и защита роутов.
+- `src/pages/`: Страницы приложения (Журнал, Рабочее место, Справочники).
+- `src/components/`: Общие UI-компоненты.
+
+---
+
+## 4. Используемые Паттерны Проектирования
+
+Система построена на надежных паттернах, обеспечивающих чистоту и тестируемость кода:
+1.  **Specification Pattern**: Используется для гибкого построения запросов к БД (фильтрация, сортировка, пагинация) без дублирования логики в репозиториях.
+2.  **Result Pattern**: Все методы сервисов возвращают объект `Result<T>`, что позволяет явно обрабатывать ошибки без использования исключений для управления логикой.
+3.  **Repository Pattern**: Абстрагирует логику хранения данных, позволяя легко заменить SQL Server на другую БД или написать Unit-тесты.
+4.  **Optimistic Concurrency**: Использование `RowVersion` на уровне БД и фронтенда предотвращает потерю данных при одновременной работе нескольких лаборантов.
+
+---
+
+## 5. Полный Перечень API Эндпоинтов
+
+### 🔑 Авторизация (`/api/auth`)
+- `POST /login`: Вход в систему (LDAP/Local). Возвращает JWT и данные пользователя.
+
+### 🧪 Лабораторные Испытания (`/api/testresults`)
+- `GET /`: Список испытаний с фильтрацией и сортировкой.
+- `GET /{id}`: Детальная информация о протоколе.
+- `POST /`: Создание нового протокола.
+- `PUT /{id}/values`: Сохранение результатов измерений.
+- `POST /{id}/complete`: Завершение испытания и фиксация результата.
+- `DELETE /{id}`: Удаление протокола (только для Admin).
+
+### 🛠 Справочники (Admin/Engineer)
+- `/api/wire-codes`: Управление кодами проволоки.
+- `/api/parameters`: Управление измеряемыми величинами.
+- `/api/limits`: Настройка допусков для продукции.
+- `/api/countries`, `/api/customers`: География и контрагенты.
+
+### 🏢 Организация (`/api/admin/laboratories`, `/api/admin/users`)
+- Управление списком лабораторий, создание инженеров и лаборантов, привязка персонала к подразделениям.
+
+### 📉 Отчеты (`/api/reports`)
+- `GET /monthly-journal`: Выгрузка Excel за месяц.
+- `GET /test-results/{id}/certificate`: Генерация PDF-сертификата.
+
+---
+
+## 6. Схема Базы Данных (Основные Сущности)
+
+*   **Users**: Сотрудники системы (Login, FullName, Role, LabId).
+*   **Laboratories**: Подразделения (Name, Location).
+*   **WireCodes**: Типы выпускаемой продукции (Code, Marking, Diameter).
+*   **Parameters**: Технические характеристики (Name, Unit, DataType).
+*   **WireCodeLimits**: "Связующая" таблица — устанавливает Min/Max для пары Код+Параметр.
+*   **TestResults**: Заголовок протокола (BatchNumber, Date, Status, AssistantId).
+*   **TestValues**: Конкретные измеренные значения для протокола.
+*   **Rejects**: Реестр брака (Reason, Date, TestResultId).
+
+---
+
+## 7. Безопасность и Интеграция
+
+*   **Аутентификация**: Поддерживается два режима:
+    1.  **LDAP**: Вход по заводскому логину и паролю (интеграция с Active Directory).
+    2.  **Local**: Локальные учетные записи для администраторов и на случай сбоя сети.
+*   **Авторизация**: JWT-токены с коротким временем жизни. Роли (`Admin`, `Engineer`, `Assistant`) зашиты в Claims токена.
+*   **Аудит**: Все критические действия (изменение лимитов, удаление протоколов, создание пользователей) логируются в системе с указанием автора и времени.
+
+---
+
+## 8. Техническое руководство по развертыванию
+
+### 8.1 Backend
+1.  **Настройка окружения**: Установите .NET 10 SDK.
+2.  **Конфигурация**: Отредактируйте `appsettings.json`.
+3.  **Миграции**: При запуске система автоматически создаст таблицы. Для ручного обновления:
+    ```bash
+    dotnet ef database update --project src/Bmz.LabTests.Infrastructure
+    ```
+
+### 8.2 Frontend
+1.  **Установка зависимостей**: `npm install`.
+2.  **Сборка**: `npm run build`.
+3.  **Переменные окружения**: Создайте `.env` файл:
+    ```env
+    VITE_API_BASE_URL=http://your-api-url/api
+    ```
+
+### 8.3 Docker (Опционально)
+Проект содержит `Dockerfile` для быстрой контейнеризации бэкенда.
+```bash
+docker build -t bmz-lab-api .
+docker run -p 8080:80 bmz-lab-api
+```
+
+---
+
+## 9. Планы по развитию
+1.  **Интеграция с весовым оборудованием**: Автоматическое считывание данных с весов через COM-порт.
+2.  **Мобильное приложение**: Для инженеров (просмотр уведомлений о браке в реальном времени).
+3.  **Модуль ИИ**: Прогнозирование вероятности брака на основе исторических данных плавки.
+
+---
+**BMZ Lab Tests System** — надежный фундамент для цифровой трансформации контроля качества.
