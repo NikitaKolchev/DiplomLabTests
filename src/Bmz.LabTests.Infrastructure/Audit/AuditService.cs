@@ -6,14 +6,13 @@ namespace Bmz.LabTests.Infrastructure.Audit;
 
 public sealed class AuditService(ApplicationDbContext dbContext) : IAuditService
 {
-    public async Task WriteAsync(
+    public void Write(
         int? actorUserId,
         string? actorLogin,
         string actionType,
         string entityType,
         string? entityId,
-        string? details,
-        CancellationToken cancellationToken)
+        string? details)
     {
         dbContext.AuditLogs.Add(new AuditLog
         {
@@ -25,7 +24,18 @@ public sealed class AuditService(ApplicationDbContext dbContext) : IAuditService
             EntityId = entityId,
             Details = details
         });
+    }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+    public Task WriteAsync(
+        int? actorUserId,
+        string? actorLogin,
+        string actionType,
+        string entityType,
+        string? entityId,
+        string? details,
+        CancellationToken cancellationToken)
+    {
+        Write(actorUserId, actorLogin, actionType, entityType, entityId, details);
+        return dbContext.SaveChangesAsync(cancellationToken);
     }
 }

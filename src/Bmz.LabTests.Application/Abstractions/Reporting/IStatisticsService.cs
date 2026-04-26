@@ -8,6 +8,7 @@ public interface IStatisticsService
         DateTime fromUtc,
         DateTime toUtc,
         StatisticsTrendGroupBy groupBy,
+        int? laboratoryId,
         CancellationToken cancellationToken);
 }
 

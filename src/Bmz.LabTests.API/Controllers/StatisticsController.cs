@@ -14,6 +14,7 @@ public sealed class StatisticsController(IStatisticsService statisticsService) :
     public async Task<IActionResult> Get(
         [FromQuery] DateTime fromUtc,
         [FromQuery] DateTime toUtc,
+        [FromQuery] int? laboratoryId,
         [FromQuery] StatisticsTrendGroupBy groupBy = StatisticsTrendGroupBy.Day,
         CancellationToken cancellationToken = default)
     {
@@ -22,6 +23,6 @@ public sealed class StatisticsController(IStatisticsService statisticsService) :
         if ((toUtc - fromUtc).TotalDays > 365)
             return BadRequest("Диапазон дат не может превышать 365 дней.");
 
-        return ToActionResult(await statisticsService.GetAsync(fromUtc, toUtc, groupBy, cancellationToken));
+        return ToActionResult(await statisticsService.GetAsync(fromUtc, toUtc, groupBy, laboratoryId, cancellationToken));
     }
 }

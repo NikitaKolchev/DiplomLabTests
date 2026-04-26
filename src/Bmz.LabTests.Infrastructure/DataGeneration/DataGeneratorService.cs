@@ -68,7 +68,7 @@ public sealed class DataGeneratorService(ApplicationDbContext dbContext) : IData
                         assistant.LaboratoryId!.Value,
                         batchNumber,
                         customerId,
-                        TestResultStatus.Completed);
+                        TestResultStatus.InProgress);
 
                     var hasDefects = false;
                     var defectReasons = new List<string>();
@@ -77,7 +77,7 @@ public sealed class DataGeneratorService(ApplicationDbContext dbContext) : IData
                     foreach (var limit in wireCode.Limits)
                     {
                         var (value, isDefect) = GenerateRealisticValue(limit);
-                        testResult.Values.Add(new TestValue(limit.ParameterId, value));
+                        testResult.AddOrUpdateValue(limit.ParameterId, value);
                         
                         if (isDefect)
                         {
@@ -86,6 +86,7 @@ public sealed class DataGeneratorService(ApplicationDbContext dbContext) : IData
                         }
                     }
 
+                    testResult.Complete();
                     testResultsBatch.Add(testResult);
                     batchMetadata.Add((testResult, hasDefects, hasDefects ? string.Join("; ", defectReasons) : null, updatedAt));
                 }

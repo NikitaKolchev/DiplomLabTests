@@ -51,9 +51,6 @@ public sealed class ProductsController(
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        if (!currentUser.IsAuthenticated || currentUser.UserId == 0)
-            return Unauthorized();
-
         return ToActionResult(await service.GetProductsAsync(
             currentUser.UserId,
             currentUser.Role,

@@ -64,7 +64,7 @@ public sealed class TestResult : BaseEntity
 
     public TestResultStatus Status { get; private set; } = TestResultStatus.InProgress;
 
-    public ICollection<TestValue> Values => _values;
+    public IReadOnlyCollection<TestValue> Values => _values.AsReadOnly();
 
     public FinalProduct? FinalProduct { get; private set; }
 

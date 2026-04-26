@@ -10,7 +10,7 @@ namespace Bmz.LabTests.Infrastructure.Products;
 
 public sealed class ProductService(
     ApplicationDbContext dbContext,
-    ITestResultRepository testResultRepository) : IProductService
+    IUserRepository userRepository) : IProductService
 {
     public async Task<Result<PaginatedListDto<ProductListItemDto>>> GetProductsAsync(
         int currentUserId,
@@ -112,8 +112,8 @@ public sealed class ProductService(
         if (!string.Equals(currentRole, Roles.Engineer, StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var user = await testResultRepository.GetUserByIdAsync(currentUserId, cancellationToken);
-        var labId = user?.LaboratoryId ?? await testResultRepository.GetLaboratoryIdByEngineerIdAsync(currentUserId, cancellationToken);
+        var user = await userRepository.GetByIdAsync(currentUserId, cancellationToken);
+        var labId = user?.LaboratoryId ?? await userRepository.GetLaboratoryIdByEngineerIdAsync(currentUserId, cancellationToken);
         return labId;
     }
 }

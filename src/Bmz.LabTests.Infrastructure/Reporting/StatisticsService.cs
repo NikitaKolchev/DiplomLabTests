@@ -20,6 +20,7 @@ public sealed class StatisticsService(ApplicationDbContext dbContext) : IStatist
         DateTime fromUtc,
         DateTime toUtc,
         StatisticsTrendGroupBy groupBy,
+        int? laboratoryId,
         CancellationToken cancellationToken)
     {
         try
@@ -28,25 +29,41 @@ public sealed class StatisticsService(ApplicationDbContext dbContext) : IStatist
                 .AsNoTracking()
                 .Where(x => x.Date >= fromUtc && x.Date < toUtc);
 
-            var totalTests = await baseQuery.CountAsync(cancellationToken);
+            if (laboratoryId.HasValue)
+            {
+                baseQuery = baseQuery.Where(x => x.LaboratoryId == laboratoryId.Value);
+            }
 
-            var completedQuery = baseQuery.Where(x => x.Status == TestResultStatus.Completed);
-            var completedTests = await completedQuery.CountAsync(cancellationToken);
+            var overviewStats = await baseQuery
+                .Select(x => new
+                {
+                    IsCompleted = x.Status == TestResultStatus.Completed,
+                    IsRejected = dbContext.Rejects.Any(r => r.TestResultId == x.Id),
+                    CycleMinutes = x.Status == TestResultStatus.Completed
+                        ? (double?)EF.Functions.DateDiffMinute(x.Date, x.UpdatedAtUtc)
+                        : null
+                })
+                .GroupBy(_ => 1)
+                .Select(g => new
+                {
+                    Total = g.Count(),
+                    Completed = g.Count(x => x.IsCompleted),
+                    Rejected = g.Count(x => x.IsRejected),
+                    AvgCycleMinutes = g.Average(x => x.CycleMinutes)
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var totalTests = overviewStats?.Total ?? 0;
+            var completedTests = overviewStats?.Completed ?? 0;
             var inProgressTests = totalTests - completedTests;
-
-            var rejectedTests = await (
-                from testResult in completedQuery
-                join reject in dbContext.Rejects.AsNoTracking() on testResult.Id equals reject.TestResultId
-                select reject.Id
-            ).CountAsync(cancellationToken);
-
-            var avgCycleMinutes = await completedQuery
-                .Select(x => (double?)EF.Functions.DateDiffMinute(x.Date, x.UpdatedAtUtc))
-                .AverageAsync(cancellationToken) ?? 0d;
+            var rejectedTests = overviewStats?.Rejected ?? 0;
+            var avgCycleMinutes = overviewStats?.AvgCycleMinutes ?? 0d;
 
             var rejectRatePercent = completedTests == 0 ? 0m : Math.Round((decimal)rejectedTests * 100m / completedTests, 2);
             var acceptanceRatePercent = completedTests == 0 ? 0m : Math.Round((decimal)(completedTests - rejectedTests) * 100m / completedTests, 2);
             var avgCycleHours = Math.Round((decimal)(avgCycleMinutes / 60d), 2);
+
+            var completedQuery = baseQuery.Where(x => x.Status == TestResultStatus.Completed);
 
             var laboratoryRows = await (
                 from testResult in completedQuery

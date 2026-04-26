@@ -12,10 +12,27 @@ public sealed class TestResultRepository(ApplicationDbContext dbContext) : ITest
 {
     public async Task<(List<TestResult> Items, int TotalCount)> GetListAsync(Specification<TestResult> specification, CancellationToken cancellationToken)
     {
+        var baseQuery = ApplySpecificationCriteriaOnly(specification);
         var query = ApplySpecification(specification);
-        var totalCount = await ApplySpecificationCriteriaOnly(specification).CountAsync(cancellationToken);
-        var items = await query.ToListAsync(cancellationToken);
-        return (items, totalCount);
+
+        // Получаем элементы и общее количество в одном запросе к БД.
+        // EF Core транслирует Count() в подзапрос, что позволяет сократить количество раундтрипов.
+        var results = await query
+            .Select(x => new
+            {
+                Item = x,
+                TotalCount = baseQuery.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        if (results.Count == 0)
+        {
+            // Если на текущей странице нет элементов, все равно нужно общее количество для пагинации.
+            var totalCount = await baseQuery.CountAsync(cancellationToken);
+            return (new List<TestResult>(), totalCount);
+        }
+
+        return (results.Select(r => r.Item).ToList(), results[0].TotalCount);
     }
 
     private IQueryable<TestResult> ApplySpecification(Specification<TestResult> specification)
@@ -73,15 +90,6 @@ public sealed class TestResultRepository(ApplicationDbContext dbContext) : ITest
             .Include(x => x.Values)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-    public Task<User?> GetUserByIdAsync(int userId, CancellationToken cancellationToken)
-        => dbContext.Users.Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
-
-    public Task<int?> GetLaboratoryIdByEngineerIdAsync(int engineerUserId, CancellationToken cancellationToken)
-        => dbContext.Users
-            .Where(x => x.Id == engineerUserId && x.Role.Name == Roles.Engineer)
-            .Select(x => (int?)x.LaboratoryId)
-            .FirstOrDefaultAsync(cancellationToken);
-
     public Task<bool> WireCodeExistsAsync(int wireCodeId, CancellationToken cancellationToken)
         => dbContext.WireCodes.AnyAsync(x => x.Id == wireCodeId, cancellationToken);
 
@@ -90,6 +98,18 @@ public sealed class TestResultRepository(ApplicationDbContext dbContext) : ITest
 
     public Task AddAsync(TestResult testResult, CancellationToken cancellationToken)
         => dbContext.TestResults.AddAsync(testResult, cancellationToken).AsTask();
+
+    public Task AddFinalProductAsync(FinalProduct finalProduct, CancellationToken cancellationToken)
+        => dbContext.FinalProducts.AddAsync(finalProduct, cancellationToken).AsTask();
+
+    public Task AddRejectAsync(Reject reject, CancellationToken cancellationToken)
+        => dbContext.Rejects.AddAsync(reject, cancellationToken).AsTask();
+
+    public Task<List<WireCodeLimit>> GetLimitsByWireCodeIdAsync(int wireCodeId, CancellationToken cancellationToken)
+        => dbContext.Limits
+            .Include(x => x.Parameter)
+            .Where(x => x.WireCodeId == wireCodeId)
+            .ToListAsync(cancellationToken);
 
     public void SetOriginalRowVersion(TestResult testResult, byte[] rowVersion)
         => dbContext.Entry(testResult).Property(x => x.RowVersion).OriginalValue = rowVersion;

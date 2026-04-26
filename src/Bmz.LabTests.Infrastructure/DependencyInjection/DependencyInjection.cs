@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<ITestResultCompletionService, TestResultCompletionService>();
         services.AddScoped<IDataGeneratorService, DataGeneratorService>();
+        services.AddScoped<ExcelReportGenerator>();
+        services.AddScoped<PdfReportGenerator>();
         services.AddSingleton<IPasswordVerifier, PasswordVerifier>();
         
         services.AddScoped<IEntitySeeder, RoleSeeder>();

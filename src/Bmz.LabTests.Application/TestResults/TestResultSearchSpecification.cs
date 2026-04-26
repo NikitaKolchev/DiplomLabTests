@@ -16,7 +16,7 @@ public sealed class TestResultSearchSpecification : Specification<TestResult>
         TestResultStatus? status,
         int page,
         int pageSize,
-        string? sortBy = null,
+        TestResultSortBy? sortBy = null,
         bool? sortDesc = null)
     {
         if (laboratoryId.HasValue)
@@ -40,32 +40,30 @@ public sealed class TestResultSearchSpecification : Specification<TestResult>
         ApplyPaging((page - 1) * pageSize, pageSize);
 
         var isDesc = sortDesc ?? true;
-        var sortByLower = sortBy?.ToLowerInvariant();
 
-        switch (sortByLower)
+        switch (sortBy)
         {
-            case "date":
+            case TestResultSortBy.Date:
                 if (isDesc) ApplyOrderByDescending(x => x.Date);
                 else ApplyOrderBy(x => x.Date);
                 break;
-            case "updatedat":
-            case "updatedatutc":
+            case TestResultSortBy.UpdatedAt:
                 if (isDesc) ApplyOrderByDescending(x => x.UpdatedAtUtc);
                 else ApplyOrderBy(x => x.UpdatedAtUtc);
                 break;
-            case "batchnumber":
+            case TestResultSortBy.BatchNumber:
                 if (isDesc) ApplyOrderByDescending(x => x.BatchNumber);
                 else ApplyOrderBy(x => x.BatchNumber);
                 break;
-            case "wirecode":
+            case TestResultSortBy.WireCode:
                 if (isDesc) ApplyOrderByDescending(x => x.WireCode.Code);
                 else ApplyOrderBy(x => x.WireCode.Code);
                 break;
-            case "assistant":
+            case TestResultSortBy.Assistant:
                 if (isDesc) ApplyOrderByDescending(x => x.Assistant.FullName);
                 else ApplyOrderBy(x => x.Assistant.FullName);
                 break;
-            case "status":
+            case TestResultSortBy.Status:
                 if (isDesc) ApplyOrderByDescending(x => x.Status);
                 else ApplyOrderBy(x => x.Status);
                 break;

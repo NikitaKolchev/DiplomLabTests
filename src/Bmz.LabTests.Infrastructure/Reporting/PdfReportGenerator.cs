@@ -1,181 +1,498 @@
 using Bmz.LabTests.Application.Abstractions.Reporting;
-using Bmz.LabTests.Application.Abstractions.Testing;
+using Bmz.LabTests.Domain.Common;
+using Bmz.LabTests.Domain.Enums;
+using Bmz.LabTests.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
-public sealed class PdfReportGenerator
+public sealed class PdfReportGenerator(ApplicationDbContext dbContext)
 {
-    public byte[] GenerateStatisticsPdf(StatisticsPdfData data, StatisticsTrendGroupBy groupBy)
+    private const string CompanyName = "ОАО «БМЗ» — Управляющая компания холдинга «БМК»";
+    private const string DepartmentName = "Сталепроволочный цех №1 — Испытательная лаборатория";
+    private const string ReportTitle = "Система регистрации лабораторных испытаний";
+
+    public async Task<Result<ReportFile>> GenerateStatisticsPdfAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        int? laboratoryId,
+        StatisticsTrendGroupBy groupBy,
+        StatisticsResponseDto? statistics,
+        CancellationToken cancellationToken)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
-
-        var groupByName = groupBy switch
+        try
         {
-            StatisticsTrendGroupBy.Day => "по дням",
-            StatisticsTrendGroupBy.Week => "по неделям",
-            StatisticsTrendGroupBy.Month => "по месяцам",
-            _ => "по дням"
-        };
+            QuestPDF.Settings.License = LicenseType.Community;
 
-        return Document.Create(container =>
-        {
-            container.Page(page =>
+            if (statistics == null)
             {
-                page.Size(PageSizes.A4);
-                page.Margin(30);
+                // Fallback to extraction if not provided
+                var extractor = new ReportDataExtractor(dbContext);
+                var data = await extractor.ExtractStatisticsDataAsync(fromUtc, toUtc, laboratoryId, groupBy, cancellationToken);
+                
+                // Map to DTO format for consistent rendering
+                statistics = new StatisticsResponseDto(
+                    new StatisticsOverviewDto(
+                        data.TotalTests,
+                        data.CompletedTests,
+                        data.InProgressTests,
+                        data.RejectedTests,
+                        data.RejectRatePercent,
+                        data.AcceptanceRatePercent,
+                        data.AvgCycleHours),
+                    data.LabStats.Select(x => new StatisticsLaboratorySliceDto(0, x.Name, x.Completed, x.Rejected, 0, 0)).ToArray(),
+                    data.WireStats.Select(x => new StatisticsWireCodeSliceDto(0, x.Code, x.Completed, x.Rejected, 0)).ToArray(),
+                    [],
+                    data.Trends.Select(x => new StatisticsTrendPointDto(x.Period, x.Total, x.Total, 0)).ToArray(),
+                    [],
+                    []);
+            }
 
-                page.Header().Column(col =>
+            var labName = laboratoryId.HasValue
+                ? await dbContext.Laboratories.Where(x => x.Id == laboratoryId.Value).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken)
+                : "Все лаборатории";
+
+            var logoBytes = GetLogo();
+            var primaryColor = Color.FromHex(ReportConstants.PrimaryColor);
+            var headerBg = Color.FromHex(ReportConstants.HeaderBg);
+            var borderColor = Color.FromHex(ReportConstants.BorderColor);
+
+            var bytes = Document.Create(container =>
+            {
+                container.Page(page =>
                 {
-                    col.Item().PaddingBottom(5).AlignCenter().Text(ReportConstants.CompanyName).FontSize(12).Bold().FontColor(Colors.Blue.Darken2);
-                    col.Item().AlignCenter().Text(ReportConstants.ReportTitle).FontSize(9).FontColor(Colors.Grey.Darken1);
-                    col.Item().PaddingTop(3).AlignCenter().Text("ОТЧЕТ ПО СТАТИСТИКЕ").FontSize(14).Bold();
-                });
+                    page.Size(PageSizes.A4);
+                    page.Margin(30);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily(Fonts.Verdana));
 
-                page.Content().Column(col =>
-                {
-                    col.Spacing(15);
-
-                    col.Item().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(summary =>
+                    page.Header().Row(row =>
                     {
-                        summary.Item().Text("ПЕРИОД И ФИЛЬТРЫ").FontSize(10).Bold().FontColor(Colors.Blue.Darken2);
-                        summary.Item().PaddingTop(5).Text($"Лаборатория: {data.LabName}").FontSize(10);
-                    });
-
-                    col.Item().Row(row =>
-                    {
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
+                        if (logoBytes != null)
                         {
-                            c.Item().Text("ВСЕГО ИСПЫТАНИЙ").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text(data.TotalTests.ToString()).FontSize(24).Bold().FontColor(Colors.Blue.Darken2);
-                        });
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
-                        {
-                            c.Item().Text("ЗАВЕРШЕНО").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text(data.CompletedTests.ToString()).FontSize(24).Bold().FontColor(Colors.Green.Medium);
-                        });
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
-                        {
-                            c.Item().Text("В РАБОТЕ").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text(data.InProgressTests.ToString()).FontSize(24).Bold().FontColor(Colors.Blue.Medium);
-                        });
-                    });
-
-                    col.Item().Row(row =>
-                    {
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
-                        {
-                            c.Item().Text("ПРИНЯТО").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text($"{data.AcceptedTests} ({data.AcceptanceRatePercent}%)").FontSize(20).Bold().FontColor(Colors.Green.Medium);
-                        });
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
-                        {
-                            c.Item().Text("ЗАБРАКОВАНО").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text($"{data.RejectedTests} ({data.RejectRatePercent}%)").FontSize(20).Bold().FontColor(Colors.Red.Medium);
-                        });
-                        row.RelativeItem().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(c =>
-                        {
-                            c.Item().Text("СР. ВРЕМЯ ЦИКЛА").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                            c.Item().PaddingTop(3).Text($"{data.AvgCycleHours} ч").FontSize(20).Bold();
-                        });
-                    });
-
-                    col.Item().PaddingTop(10).Text("ДИНАМИКА ИСПЫТАНИЙ").FontSize(11).Bold().FontColor(Colors.Blue.Darken2);
-                    col.Item().Border(1).BorderColor(ReportConstants.BorderColor).Padding(10).Column(chartCol =>
-                    {
-                        if (data.Trends.Count > 0)
-                        {
-                            var maxVal = data.Trends.Max(x => x.Total);
-                            foreach (var point in data.Trends)
-                            {
-                                var barWidth = maxVal > 0 ? (int)(point.Total * 30.0 / maxVal) : 0;
-                                var label = point.Period.ToString("dd.MM");
-                                chartCol.Item().Row(r =>
-                                {
-                                    r.AutoItem().Text(label).FontSize(8);
-                                    r.AutoItem().Width(barWidth).Height(10).Background(Colors.Blue.Darken2);
-                                    r.AutoItem().PaddingLeft(3).Text(point.Total.ToString()).FontSize(8);
-                                });
-                            }
+                            row.ConstantItem(60).Image(logoBytes);
                         }
-                        else
+
+                        row.RelativeItem().Column(col =>
                         {
-                            chartCol.Item().Text("Нет данных").FontColor(Colors.Grey.Medium);
-                        }
+                            col.Item().Text(CompanyName).FontSize(12).Bold().FontColor(primaryColor);
+                            col.Item().Text(DepartmentName).FontSize(10).FontColor(Colors.Grey.Darken2);
+                            col.Item().Text(ReportTitle).FontSize(8).Italic().FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.RelativeItem().AlignRight().Column(col =>
+                        {
+                            col.Item().Text("СТАТИСТИЧЕСКИЙ ОТЧЕТ").FontSize(14).Bold();
+                            col.Item().Text($"{fromUtc:dd.MM.yyyy} — {toUtc:dd.MM.yyyy}").FontSize(10);
+                        });
                     });
 
-                    col.Item().PaddingTop(10).Row(row =>
+                    page.Content().Column(col =>
                     {
-                        row.RelativeItem().Column(labCol =>
+                        col.Spacing(15);
+
+                        // Filters summary
+                        col.Item().PaddingTop(10).BorderBottom(1).BorderColor(borderColor).PaddingBottom(5).Row(row =>
                         {
-                            labCol.Item().Text("ПО ЛАБОРАТОРИЯМ").FontSize(11).Bold().FontColor(Colors.Blue.Darken2);
-                            labCol.Item().Border(1).BorderColor(ReportConstants.BorderColor).Padding(5).Table(table =>
+                            row.RelativeItem().Text(t =>
                             {
-                                table.ColumnsDefinition(c =>
+                                t.Span("Фильтр: ").Bold();
+                                t.Span(labName);
+                            });
+                            row.RelativeItem().AlignRight().Text(t =>
+                            {
+                                t.Span("Группировка: ").Bold();
+                                t.Span(groupBy switch
                                 {
-                                    c.RelativeColumn(3);
-                                    c.RelativeColumn(1);
-                                    c.RelativeColumn(1);
-                                    c.RelativeColumn(1);
+                                    StatisticsTrendGroupBy.Day => "По дням",
+                                    StatisticsTrendGroupBy.Week => "По неделям",
+                                    StatisticsTrendGroupBy.Month => "По месяцам",
+                                    _ => "По дням"
                                 });
-                                table.Header(h =>
-                                {
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Лаборатория").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Всего").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Брак").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("%").FontColor(Colors.White).FontSize(8).Bold();
-                                });
-                                foreach (var lab in data.LabStats.Take(8))
-                                {
-                                    var rate = lab.Completed == 0 ? 0 : Math.Round((decimal)lab.Rejected * 100 / lab.Completed, 1);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(lab.Name).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(lab.Completed.ToString()).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(lab.Rejected.ToString()).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text($"{rate}%").FontSize(8).FontColor(rate > 10 ? Colors.Red.Medium : Colors.Black);
-                                }
                             });
                         });
-                        row.ConstantItem(10);
-                        row.RelativeItem().Column(wireCol =>
+
+                        // Key metrics cards
+                        col.Item().Row(row =>
                         {
-                            wireCol.Item().Text("ПО КОДАМ ПРОВОЛОКИ").FontSize(11).Bold().FontColor(Colors.Blue.Darken2);
-                            wireCol.Item().Border(1).BorderColor(ReportConstants.BorderColor).Padding(5).Table(table =>
+                            row.Spacing(10);
+                            row.RelativeItem().Component(new MetricCard("ВСЕГО", statistics.Overview.TotalTests.ToString(), ReportConstants.AccentColor));
+                            row.RelativeItem().Component(new MetricCard("ПРИНЯТО", $"{statistics.Overview.CompletedTests - statistics.Overview.RejectedTests}", ReportConstants.SuccessColor));
+                            row.RelativeItem().Component(new MetricCard("БРАК", statistics.Overview.RejectedTests.ToString(), ReportConstants.DangerColor));
+                            row.RelativeItem().Component(new MetricCard("% БРАКА", $"{statistics.Overview.RejectRatePercent}%", statistics.Overview.RejectRatePercent > 5 ? ReportConstants.DangerColor : ReportConstants.SuccessColor));
+                        });
+
+                        // Trends section
+                        if (statistics.Trends.Any())
+                        {
+                            col.Item().Column(trendCol =>
                             {
-                                table.ColumnsDefinition(c =>
+                                trendCol.Item().Text("ДИНАМИКА ИСПЫТАНИЙ").FontSize(11).Bold().FontColor(primaryColor);
+                                trendCol.Item().PaddingTop(5).Height(150).Border(1).BorderColor(borderColor).Padding(10).Row(row =>
                                 {
-                                    c.RelativeColumn(2);
-                                    c.RelativeColumn(1);
-                                    c.RelativeColumn(1);
-                                    c.RelativeColumn(1);
+                                    var maxVal = statistics.Trends.Max(x => x.TotalTests);
+                                    if (maxVal == 0) maxVal = 1;
+
+                                    foreach (var point in statistics.Trends.TakeLast(15))
+                                    {
+                                        row.RelativeItem().Column(c =>
+                                        {
+                                            c.Item().Extend().AlignBottom().Row(r =>
+                                            {
+                                                r.RelativeItem().Height((float)point.TotalTests * 100 / maxVal).Background(primaryColor);
+                                            });
+                                            c.Item().AlignCenter().Text(point.PeriodStartUtc.ToString("dd.MM")).FontSize(7);
+                                        });
+                                    }
                                 });
-                                table.Header(h =>
+                            });
+                        }
+
+                        // Detailed tables
+                        col.Item().Row(row =>
+                        {
+                            row.Spacing(20);
+
+                            // Lab stats
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("ПО ЛАБОРАТОРИЯМ").FontSize(11).Bold().FontColor(primaryColor);
+                                c.Item().PaddingTop(5).Table(table =>
                                 {
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Код").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Всего").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("Брак").FontColor(Colors.White).FontSize(8).Bold();
-                                    h.Cell().Background(ReportConstants.HeaderBg).Padding(4).Text("%").FontColor(Colors.White).FontSize(8).Bold();
+                                    table.ColumnsDefinition(cd =>
+                                    {
+                                        cd.RelativeColumn(3);
+                                        cd.RelativeColumn(1);
+                                        cd.RelativeColumn(1);
+                                    });
+                                    table.Header(h =>
+                                    {
+                                        h.Cell().Element(HeaderStyle).Text("Лаборатория");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("Всего");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("Брак");
+                                    });
+                                    foreach (var lab in statistics.Laboratories.Take(10))
+                                    {
+                                        table.Cell().Element(CellStyle).Text(lab.LaboratoryName);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text(lab.CompletedTests.ToString());
+                                        table.Cell().Element(CellStyle).AlignCenter().Text(lab.RejectedTests.ToString()).FontColor(lab.RejectedTests > 0 ? Color.FromHex(ReportConstants.DangerColor) : Colors.Black);
+                                    }
                                 });
-                                foreach (var wire in data.WireStats.OrderByDescending(x => x.Completed).Take(8))
+                            });
+
+                            // Wire stats
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("ТОП-10 БРАКА (КОДЫ)").FontSize(11).Bold().FontColor(primaryColor);
+                                c.Item().PaddingTop(5).Table(table =>
                                 {
-                                    var rate = wire.Completed == 0 ? 0 : Math.Round((decimal)wire.Rejected * 100 / wire.Completed, 1);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(wire.Code).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(wire.Completed.ToString()).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text(wire.Rejected.ToString()).FontSize(8);
-                                    table.Cell().BorderBottom(0.5f).BorderColor(ReportConstants.BorderColor).Padding(4).Text($"{rate}%").FontSize(8).FontColor(rate > 10 ? Colors.Red.Medium : Colors.Black);
-                                }
+                                    table.ColumnsDefinition(cd =>
+                                    {
+                                        cd.RelativeColumn(3);
+                                        cd.RelativeColumn(1);
+                                        cd.RelativeColumn(1);
+                                    });
+                                    table.Header(h =>
+                                    {
+                                        h.Cell().Element(HeaderStyle).Text("Код");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("Всего");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("Брак");
+                                    });
+                                    foreach (var wire in statistics.WireCodes.OrderByDescending(x => x.RejectRatePercent).Take(10))
+                                    {
+                                        table.Cell().Element(CellStyle).Text(wire.WireCode);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text(wire.CompletedTests.ToString());
+                                        table.Cell().Element(CellStyle).AlignCenter().Text(wire.RejectedTests.ToString()).FontColor(wire.RejectedTests > 0 ? Color.FromHex(ReportConstants.DangerColor) : Colors.Black);
+                                    }
+                                });
+                            });
+                        });
+
+                        // Reject reasons if available
+                        if (statistics.RejectReasons.Any())
+                        {
+                            col.Item().Column(c =>
+                            {
+                                c.Item().Text("ПРИЧИНЫ БРАКОВКИ").FontSize(11).Bold().FontColor(primaryColor);
+                                c.Item().PaddingTop(5).Table(table =>
+                                {
+                                    table.ColumnsDefinition(cd =>
+                                    {
+                                        cd.RelativeColumn(5);
+                                        cd.RelativeColumn(1);
+                                        cd.RelativeColumn(1);
+                                    });
+                                    table.Header(h =>
+                                    {
+                                        h.Cell().Element(HeaderStyle).Text("Причина");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("Кол-во");
+                                        h.Cell().Element(HeaderStyle).AlignCenter().Text("%");
+                                    });
+                                    foreach (var reason in statistics.RejectReasons.Take(5))
+                                    {
+                                        table.Cell().Element(CellStyle).Text(reason.Reason);
+                                        table.Cell().Element(CellStyle).AlignCenter().Text(reason.Count.ToString());
+                                        table.Cell().Element(CellStyle).AlignCenter().Text($"{reason.SharePercent}%");
+                                    }
+                                });
+                            });
+                        }
+                    });
+
+                    page.Footer().Column(f =>
+                    {
+                        f.Item().BorderTop(1).BorderColor(borderColor).PaddingTop(5).Row(row =>
+                        {
+                            row.RelativeItem().Text($"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
+                            row.RelativeItem().AlignRight().Text(x =>
+                            {
+                                x.Span("Страница ").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
+                                x.CurrentPageNumber().FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
+                                x.Span(" из ").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
+                                x.TotalPages().FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
                             });
                         });
                     });
                 });
+            }).GeneratePdf();
 
-                page.Footer().AlignCenter().Column(c =>
-                {
-                    c.Item().Text($"Сформировано: {DateTime.UtcNow:dd.MM.yyyy HH:mm} UTC").FontSize(8).FontColor(Colors.Grey.Medium);
-                    c.Item().Text("Статистический отчет — ОАО «БМЗ»").FontSize(8).FontColor(Colors.Grey.Medium);
-                });
+            return Result.Success(new ReportFile
+            {
+                Content = bytes,
+                ContentType = "application/pdf",
+                FileName = $"statistics-{fromUtc:yyyyMMdd}-{toUtc:yyyyMMdd}.pdf"
             });
-        }).GeneratePdf();
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<ReportFile>($"Ошибка при генерации PDF: {ex.Message}");
+        }
+    }
+
+    public async Task<Result<ReportFile>> GenerateBatchCertificatePdfAsync(int testResultId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+
+            var item = await dbContext.TestResults
+                .AsNoTracking()
+                .Include(x => x.WireCode)
+                .Include(x => x.Assistant)
+                .Include(x => x.Laboratory)
+                .Include(x => x.Customer)
+                .Include(x => x.Values).ThenInclude(v => v.Parameter)
+                .Include(x => x.Reject)
+                .FirstOrDefaultAsync(x => x.Id == testResultId, cancellationToken);
+
+            if (item == null) return Result.Failure<ReportFile>("Испытание не найдено");
+
+            var logoBytes = GetLogo();
+            var primaryColor = Color.FromHex(ReportConstants.PrimaryColor);
+            var borderColor = Color.FromHex(ReportConstants.BorderColor);
+
+            var bytes = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(11).FontFamily(Fonts.Verdana));
+
+                    page.Header().Row(row =>
+                    {
+                        if (logoBytes != null)
+                        {
+                            row.ConstantItem(70).Image(logoBytes);
+                        }
+
+                        row.RelativeItem().PaddingLeft(10).Column(col =>
+                        {
+                            col.Item().Text(CompanyName).FontSize(12).Bold().FontColor(primaryColor);
+                            col.Item().Text(DepartmentName).FontSize(10);
+                            col.Item().Text("247210, Гомельская обл., г. Жлобин, ул. Промышленная, 37").FontSize(8);
+                        });
+
+                        row.ConstantItem(150).AlignRight().Column(col =>
+                        {
+                            col.Item().Border(1).Padding(5).AlignCenter().Column(c =>
+                            {
+                                c.Item().Text("СЕРТИФИКАТ").FontSize(10).Bold();
+                                c.Item().Text("КАЧЕСТВА").FontSize(10).Bold();
+                                c.Item().Text($"№ {item.Id:D6}").FontSize(12).Bold().FontColor(primaryColor);
+                            });
+                        });
+                    });
+
+                    page.Content().PaddingTop(20).Column(col =>
+                    {
+                        col.Spacing(10);
+
+                        // Main info table
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(cd =>
+                            {
+                                cd.RelativeColumn(1);
+                                cd.RelativeColumn(2);
+                            });
+
+                            table.Cell().Element(LabelStyle).Text("Наименование продукции:");
+                            table.Cell().Element(ValueStyle).Text($"Проволока стальная {item.WireCode.Code}");
+
+                            table.Cell().Element(LabelStyle).Text("Номер партии:");
+                            table.Cell().Element(ValueStyle).Text(item.BatchNumber).Bold();
+
+                            table.Cell().Element(LabelStyle).Text("Дата изготовления/испытания:");
+                            table.Cell().Element(ValueStyle).Text(item.Date.ToString("dd.MM.yyyy"));
+
+                            table.Cell().Element(LabelStyle).Text("Потребитель:");
+                            table.Cell().Element(ValueStyle).Text(item.Customer?.Name ?? "Внутреннее перемещение");
+                        });
+
+                        col.Item().PaddingTop(15).Text("РЕЗУЛЬТАТЫ ИСПЫТАНИЙ").FontSize(12).Bold().AlignCenter();
+
+                        // Results table
+                        col.Item().PaddingTop(5).Table(table =>
+                        {
+                            table.ColumnsDefinition(cd =>
+                            {
+                                cd.RelativeColumn(4);
+                                cd.RelativeColumn(2);
+                                cd.RelativeColumn(2);
+                            });
+
+                            table.Header(h =>
+                            {
+                                h.Cell().Element(HeaderStyle).Text("Наименование показателя");
+                                h.Cell().Element(HeaderStyle).AlignCenter().Text("Ед. изм.");
+                                h.Cell().Element(HeaderStyle).AlignCenter().Text("Факт");
+                            });
+
+                            foreach (var val in item.Values)
+                            {
+                                table.Cell().Element(CellStyle).Text(val.Parameter.Name);
+                                table.Cell().Element(CellStyle).AlignCenter().Text(val.Parameter.Unit ?? "—");
+                                table.Cell().Element(CellStyle).AlignCenter().Text(val.Value).Bold();
+                            }
+                        });
+
+                        // Decision
+                        col.Item().PaddingTop(20).Border(1).Padding(10).Row(row =>
+                        {
+                            var isAccepted = item.Status == TestResultStatus.Completed && item.Reject == null;
+                            row.RelativeItem().Text(t =>
+                            {
+                                t.Span("ЗАКЛЮЧЕНИЕ: ").Bold();
+                                if (isAccepted)
+                                {
+                                    t.Span("Продукция соответствует требованиям нормативной документации и признана годной.").FontColor(Colors.Green.Darken2);
+                                }
+                                else
+                                {
+                                    t.Span("Продукция НЕ СООТВЕТСТВУЕТ требованиям. ").FontColor(Colors.Red.Medium);
+                                    if (item.Reject != null) t.Span($"Причина: {item.Reject.Reason}");
+                                }
+                            });
+                        });
+
+                        // Signatures
+                        col.Item().PaddingTop(40).Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("Лаборант").FontSize(9);
+                                c.Item().PaddingTop(15).BorderTop(1).Text(item.Assistant.FullName).FontSize(10).Bold();
+                            });
+                            row.ConstantItem(50);
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("Начальник смены / Инженер").FontSize(9);
+                                c.Item().PaddingTop(15).BorderTop(1).Text("____________________").FontSize(10);
+                            });
+                        });
+                    });
+
+                    page.Footer().AlignCenter().Text(t =>
+                    {
+                        t.Span("Настоящий сертификат подтверждает качество продукции ОАО «БМЗ»").FontSize(8).FontColor(Colors.Grey.Medium);
+                    });
+                });
+            }).GeneratePdf();
+
+            return Result.Success(new ReportFile
+            {
+                Content = bytes,
+                ContentType = "application/pdf",
+                FileName = $"Certificate_{item.BatchNumber}_{item.Date:yyyyMMdd}.pdf"
+            });
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<ReportFile>($"Ошибка при генерации сертификата: {ex.Message}");
+        }
+    }
+
+    private byte[]? GetLogo()
+    {
+        try
+        {
+            var searchPaths = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "Bmz.png"),
+                Path.Combine(Directory.GetCurrentDirectory(), "frontend", "Bmz.png"),
+                Path.Combine(Directory.GetCurrentDirectory(), "frontend", "public", "Bmz-removebg-preview.png"),
+                Path.Combine(Directory.GetCurrentDirectory(), "frontend", "public", "favicon.png")
+            };
+
+            foreach (var path in searchPaths)
+            {
+                if (File.Exists(path)) return File.ReadAllBytes(path);
+            }
+
+            return null;
+        }
+        catch { return null; }
+    }
+
+    // Styles
+    private IContainer HeaderStyle(IContainer container) => container
+        .Background(Color.FromHex(ReportConstants.HeaderBg))
+        .Padding(5)
+        .DefaultTextStyle(x => x.FontColor(Colors.White).Bold().FontSize(9));
+
+    private IContainer CellStyle(IContainer container) => container
+        .BorderBottom(0.5f)
+        .BorderColor(Color.FromHex(ReportConstants.BorderColor))
+        .Padding(5)
+        .DefaultTextStyle(x => x.FontSize(9));
+
+    private IContainer LabelStyle(IContainer container) => container
+        .PaddingVertical(3)
+        .DefaultTextStyle(x => x.FontSize(10).FontColor(Color.FromHex(ReportConstants.MutedColor)));
+
+    private IContainer ValueStyle(IContainer container) => container
+        .PaddingVertical(3)
+        .DefaultTextStyle(x => x.FontSize(10).Bold());
+
+    private class MetricCard(string label, string value, string color) : IComponent
+    {
+        public void Compose(IContainer container)
+        {
+            container
+                .Border(1)
+                .BorderColor(Color.FromHex(ReportConstants.BorderColor))
+                .Decoration(decoration =>
+                {
+                    decoration.Before().Height(3).Background(color);
+                    decoration.Content().Padding(10).Column(c =>
+                    {
+                        c.Item().Text(label).FontSize(8).Bold().FontColor(Color.FromHex(ReportConstants.MutedColor));
+                        c.Item().Text(value).FontSize(18).Bold().FontColor(color);
+                    });
+                });
+        }
     }
 }

@@ -27,7 +27,7 @@ public sealed class TestResultsController(
         [FromQuery] TestResultStatus? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? sortBy = null,
+        [FromQuery] TestResultSortBy? sortBy = null,
         [FromQuery] bool? sortDesc = null,
         CancellationToken cancellationToken = default)
     {
@@ -54,9 +54,6 @@ public sealed class TestResultsController(
     [Authorize(Roles = Roles.Assistant)]
     public async Task<IActionResult> Create([FromBody] CreateTestResultRequest request, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsAuthenticated || currentUser.UserId == 0)
-            return Unauthorized();
-
         var result = await service.CreateAsync(
             currentUser.UserId,
             currentUser.Role,
@@ -84,9 +81,6 @@ public sealed class TestResultsController(
     [Authorize(Roles = $"{Roles.Assistant},{Roles.Engineer},{Roles.Admin}")]
     public async Task<IActionResult> SaveValues(int id, [FromBody] SaveTestValuesRequest request, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsAuthenticated || currentUser.UserId == 0)
-            return Unauthorized();
-
         try
         {
             var result = await service.SaveValuesAsync(
@@ -110,9 +104,6 @@ public sealed class TestResultsController(
     [Authorize(Roles = $"{Roles.Assistant},{Roles.Engineer},{Roles.Admin}")]
     public async Task<IActionResult> Complete(int id, [FromBody] CompleteTestResultRequest request, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsAuthenticated || currentUser.UserId == 0)
-            return Unauthorized();
-
         try
         {
             var result = await service.CompleteAsync(currentUser.UserId, currentUser.Role, id, request.RowVersion, cancellationToken);
@@ -128,9 +119,6 @@ public sealed class TestResultsController(
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        if (!currentUser.IsAuthenticated || currentUser.UserId == 0)
-            return Unauthorized();
-
         var result = await service.DeleteAsync(currentUser.UserId, currentUser.Role, id, cancellationToken);
         return ToActionResult(result);
     }

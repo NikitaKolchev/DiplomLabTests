@@ -11,8 +11,11 @@ namespace Bmz.LabTests.Application.TestResults;
 
 public sealed class TestResultService(
     ITestResultRepository repository,
+    IUserRepository userRepository,
     ITestResultCompletionService completionService) : ITestResultService
 {
+    private Result<int?>? _cachedLaboratoryScope;
+
     public async Task<Result<PaginatedListDto<TestResultListItemDto>>> GetListAsync(
         int currentUserId,
         string currentRole,
@@ -23,7 +26,7 @@ public sealed class TestResultService(
         TestResultStatus? status,
         int page,
         int pageSize,
-        string? sortBy,
+        TestResultSortBy? sortBy,
         bool? sortDesc,
         CancellationToken cancellationToken)
     {
@@ -31,7 +34,7 @@ public sealed class TestResultService(
         {
             var laboratoryIdResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
             if (!laboratoryIdResult.IsSuccess)
-                return Result.Failure<PaginatedListDto<TestResultListItemDto>>(laboratoryIdResult.Error!);
+                return Result.Failure<PaginatedListDto<TestResultListItemDto>>(laboratoryIdResult.Error);
 
             var laboratoryIdFilter = laboratoryIdResult.Value;
 
@@ -78,14 +81,14 @@ public sealed class TestResultService(
             return Result.Failure<CreatedTestResultDto>("Указанный код проволоки не существует.");
         }
 
-        var currentUser = await repository.GetUserByIdAsync(currentUserId, cancellationToken);
+        var currentUser = await userRepository.GetByIdAsync(currentUserId, cancellationToken);
         if (currentUser is null)
-            return Result.Failure<CreatedTestResultDto>("Текущий пользователь не найден.");
+            return Result.Failure<CreatedTestResultDto>(Error.NotFound("Текущий пользователь не найден."));
 
         var laboratoryId = currentUser.LaboratoryId ?? 0;
         if (string.Equals(currentRole, Roles.Assistant, StringComparison.OrdinalIgnoreCase) && laboratoryId == 0)
         {
-            return Result.Failure<CreatedTestResultDto>("Лаборант не назначен в лабораторию.");
+            return Result.Failure<CreatedTestResultDto>(Error.Forbidden("Лаборант не назначен в лабораторию."));
         }
 
         var entity = new TestResult(
@@ -112,19 +115,18 @@ public sealed class TestResultService(
     {
         var item = await repository.GetByIdWithValuesAsync(id, cancellationToken);
         if (item is null)
-        {
-            return Result.Failure<TestResultDetailsDto>("Результат испытания не найден.");
-        }
+            return Result.Failure<TestResultDetailsDto>(Error.NotFound("Результат испытания не найден."));
+
+        var laboratoryIdResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
+        if (!laboratoryIdResult.IsSuccess)
+            return Result.Failure<TestResultDetailsDto>(laboratoryIdResult.Error);
 
         var isAdmin = string.Equals(currentRole, Roles.Admin, StringComparison.OrdinalIgnoreCase);
         if (!isAdmin && IsLaboratoryScopedRole(currentRole))
         {
-            var labResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
-            if (!labResult.IsSuccess)
-                return Result.Failure<TestResultDetailsDto>(labResult.Error!);
-            if (item.LaboratoryId != labResult.Value)
+            if (item.LaboratoryId != laboratoryIdResult.Value)
             {
-                return Result.Failure<TestResultDetailsDto>("Доступ запрещен.");
+                return Result.Failure<TestResultDetailsDto>(Error.Forbidden("Доступ запрещен."));
             }
         }
 
@@ -150,17 +152,17 @@ public sealed class TestResultService(
         var testResult = await repository.GetByIdWithValuesAsync(id, cancellationToken);
         if (testResult is null)
         {
-            return Result.Failure<SavedTestResultDto>("Результат испытания не найден.");
+            return Result.Failure<SavedTestResultDto>(Error.NotFound("Результат испытания не найден."));
         }
 
         if (IsLaboratoryScopedRole(currentRole))
         {
             var labResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
             if (!labResult.IsSuccess)
-                return Result.Failure<SavedTestResultDto>(labResult.Error!);
+                return Result.Failure<SavedTestResultDto>(labResult.Error);
             if (testResult.LaboratoryId != labResult.Value)
             {
-                return Result.Failure<SavedTestResultDto>("Доступ запрещен.");
+                return Result.Failure<SavedTestResultDto>(Error.Forbidden("Нет доступа к испытанию другой лаборатории."));
             }
         }
 
@@ -202,15 +204,15 @@ public sealed class TestResultService(
             var testResult = await repository.GetByIdAsync(id, cancellationToken);
             if (testResult is null)
             {
-                return Result.Failure<CompletionResult>("Результат испытания не найден.");
+                return Result.Failure<CompletionResult>(Error.NotFound("Результат испытания не найден."));
             }
 
             var labResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
             if (!labResult.IsSuccess)
-                return Result.Failure<CompletionResult>(labResult.Error!);
+                return Result.Failure<CompletionResult>(labResult.Error);
             if (testResult.LaboratoryId != labResult.Value)
             {
-                return Result.Failure<CompletionResult>("Доступ запрещен.");
+                return Result.Failure<CompletionResult>(Error.Forbidden("Нет доступа к испытанию другой лаборатории."));
             }
         }
 
@@ -220,10 +222,16 @@ public sealed class TestResultService(
     public async Task<Result> DeleteAsync(int currentUserId, string currentRole, int id, CancellationToken cancellationToken)
     {
         if (!string.Equals(currentRole, Roles.Admin, StringComparison.OrdinalIgnoreCase))
-            return Result.Failure("Только администратор может удалять записи.");
+            return Result.Failure(Error.Forbidden("Только администратор может удалять записи."));
 
-        var deleted = await repository.DeleteByIdAsync(id, cancellationToken);
-        return deleted ? Result.Success() : Result.Failure("Запись не найдена.");
+        var item = await repository.GetByIdAsync(id, cancellationToken);
+        if (item is null)
+            return Result.Failure(Error.NotFound("Результат испытания не найден."));
+
+        if (!await repository.DeleteByIdAsync(id, cancellationToken))
+            return Result.Failure(Error.Failure("Не удалось удалить испытание."));
+
+        return Result.Success();
     }
 
     private static bool TryParseRowVersion(string base64, out byte[] rowVersion)
@@ -242,30 +250,56 @@ public sealed class TestResultService(
 
     private async Task<Result<int?>> ResolveLaboratoryScopeAsync(int currentUserId, string currentRole, CancellationToken cancellationToken)
     {
+        if (_cachedLaboratoryScope != null)
+            return _cachedLaboratoryScope;
+
         if (currentUserId == 0 || string.IsNullOrEmpty(currentRole) || string.Equals(currentRole, "Guest", StringComparison.OrdinalIgnoreCase))
-            return Result.Success<int?>(null);
+        {
+            _cachedLaboratoryScope = Result.Success<int?>(null);
+            return _cachedLaboratoryScope;
+        }
 
         if (!IsLaboratoryScopedRole(currentRole))
-            return Result.Success<int?>(null);
+        {
+            _cachedLaboratoryScope = Result.Success<int?>(null);
+            return _cachedLaboratoryScope;
+        }
 
-        var currentUser = await repository.GetUserByIdAsync(currentUserId, cancellationToken);
-        if (currentUser is null)
-            return Result.Failure<int?>($"Пользователь с ID {currentUserId} не найден.");
+        var user = await userRepository.GetByIdAsync(currentUserId, cancellationToken);
+        if (user == null)
+        {
+            _cachedLaboratoryScope = Result.Failure<int?>(Error.NotFound("Пользователь не найден."));
+            return _cachedLaboratoryScope;
+        }
 
         if (string.Equals(currentRole, Roles.Assistant, StringComparison.OrdinalIgnoreCase))
         {
-            if (!currentUser.LaboratoryId.HasValue)
-                return Result.Failure<int?>("Лаборант не назначен в лабораторию.");
-            return Result.Success<int?>(currentUser.LaboratoryId.Value);
+            if (!user.LaboratoryId.HasValue)
+            {
+                _cachedLaboratoryScope = Result.Failure<int?>(Error.Forbidden("Лаборант не назначен в лабораторию."));
+            }
+            else
+            {
+                _cachedLaboratoryScope = Result.Success(user.LaboratoryId);
+            }
+            return _cachedLaboratoryScope;
         }
 
-        var engineerLaboratoryId = currentUser.LaboratoryId
-            ?? await repository.GetLaboratoryIdByEngineerIdAsync(currentUserId, cancellationToken);
-        
-        if (!engineerLaboratoryId.HasValue)
-            return Result.Failure<int?>("Инженер не назначен в лабораторию.");
-        
-        return Result.Success<int?>(engineerLaboratoryId.Value);
+        if (string.Equals(currentRole, Roles.Engineer, StringComparison.OrdinalIgnoreCase))
+        {
+            var engineerLaboratoryId = user.LaboratoryId ?? await userRepository.GetLaboratoryIdByEngineerIdAsync(currentUserId, cancellationToken);
+            if (!engineerLaboratoryId.HasValue)
+            {
+                _cachedLaboratoryScope = Result.Failure<int?>(Error.Forbidden("Инженер не назначен в лабораторию."));
+            }
+            else
+            {
+                _cachedLaboratoryScope = Result.Success(engineerLaboratoryId);
+            }
+            return _cachedLaboratoryScope;
+        }
+
+        return _cachedLaboratoryScope ?? Result.Success<int?>(null);
     }
 
     private static bool IsLaboratoryScopedRole(string role)

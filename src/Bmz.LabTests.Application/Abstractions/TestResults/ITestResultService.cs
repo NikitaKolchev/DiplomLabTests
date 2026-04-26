@@ -17,7 +17,7 @@ public interface ITestResultService
         TestResultStatus? status,
         int page,
         int pageSize,
-        string? sortBy,
+        TestResultSortBy? sortBy,
         bool? sortDesc,
         CancellationToken cancellationToken);
 

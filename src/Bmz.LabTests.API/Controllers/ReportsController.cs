@@ -86,7 +86,7 @@ public sealed class ReportsController(
         [FromQuery] DateTime fromUtc,
         [FromQuery] DateTime toUtc,
         [FromQuery] int? laboratoryId,
-        [FromQuery] int groupBy,
+        [FromQuery] StatisticsTrendGroupBy groupBy,
         CancellationToken cancellationToken)
     {
         if (fromUtc >= toUtc)
@@ -94,18 +94,10 @@ public sealed class ReportsController(
         if ((toUtc - fromUtc).TotalDays > 365)
             return BadRequest("Диапазон дат не может превышать 365 дней.");
 
-        var groupByEnum = groupBy switch
-        {
-            1 => StatisticsTrendGroupBy.Day,
-            2 => StatisticsTrendGroupBy.Week,
-            3 => StatisticsTrendGroupBy.Month,
-            _ => StatisticsTrendGroupBy.Day
-        };
-
-        var statsResult = await statisticsService.GetAsync(fromUtc, toUtc, groupByEnum, cancellationToken);
+        var statsResult = await statisticsService.GetAsync(fromUtc, toUtc, groupBy, laboratoryId, cancellationToken);
         if (statsResult.IsFailure) return ToActionResult(statsResult);
 
-        var reportResult = await reportService.GenerateStatisticsPdfWithChartsAsync(fromUtc, toUtc, laboratoryId, groupByEnum, statsResult.Value, cancellationToken);
+        var reportResult = await reportService.GenerateStatisticsPdfWithChartsAsync(fromUtc, toUtc, laboratoryId, groupBy, statsResult.Value, cancellationToken);
         if (reportResult.IsFailure) return ToActionResult(reportResult);
 
         var report = reportResult.Value;

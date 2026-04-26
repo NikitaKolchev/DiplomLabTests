@@ -10,12 +10,13 @@ public interface ITestResultRepository
 
     Task<TestResult?> GetByIdAsync(int id, CancellationToken cancellationToken);
     Task<TestResult?> GetByIdWithValuesAsync(int id, CancellationToken cancellationToken);
-    Task<User?> GetUserByIdAsync(int userId, CancellationToken cancellationToken);
-    Task<int?> GetLaboratoryIdByEngineerIdAsync(int engineerUserId, CancellationToken cancellationToken);
     Task<bool> WireCodeExistsAsync(int wireCodeId, CancellationToken cancellationToken);
     Task<List<int>> GetAllowedParameterIdsAsync(int wireCodeId, CancellationToken cancellationToken);
 
     Task AddAsync(TestResult testResult, CancellationToken cancellationToken);
+    Task AddFinalProductAsync(FinalProduct finalProduct, CancellationToken cancellationToken);
+    Task AddRejectAsync(Reject reject, CancellationToken cancellationToken);
+    Task<List<WireCodeLimit>> GetLimitsByWireCodeIdAsync(int wireCodeId, CancellationToken cancellationToken);
     void SetOriginalRowVersion(TestResult testResult, byte[] rowVersion);
     Task SaveChangesAsync(CancellationToken cancellationToken);
     Task<bool> DeleteByIdAsync(int id, CancellationToken cancellationToken);
