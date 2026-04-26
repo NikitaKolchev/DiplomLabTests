@@ -1,0 +1,12 @@
+bin/
+obj/
+
+frontend/node_modules/
+frontend/dist/
+
+.vs/
+.idea/
+.vscode/
+
+*.user
+*.suo

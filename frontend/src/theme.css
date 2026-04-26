@@ -1,0 +1,41 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Smooth transitions for common Ant Design elements when theme changes */
+.ant-layout,
+.ant-layout-header,
+.ant-layout-sider,
+.ant-layout-content,
+.ant-card,
+.ant-table,
+.ant-table-cell,
+.ant-menu,
+.ant-typography,
+.ant-btn {
+  transition: background-color 0.3s ease, 
+              border-color 0.3s ease, 
+              color 0.3s ease, 
+              box-shadow 0.3s ease !important;
+}
+
+/* Specific adjustments for theme modes */
+.theme-dark {
+  color-scheme: dark;
+}
+
+.theme-light {
+  color-scheme: light;
+}
+
+/* Hide scrollbar horizontal on tables on small screens if not needed */
+.ant-table-content {
+  overflow-x: auto !important;
+}

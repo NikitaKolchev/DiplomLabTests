@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Bmz.LabTests.API/Bmz.LabTests.API.csproj" />
+    <Project Path="src/Bmz.LabTests.Application/Bmz.LabTests.Application.csproj" />
+    <Project Path="src/Bmz.LabTests.Domain/Bmz.LabTests.Domain.csproj" />
+    <Project Path="src/Bmz.LabTests.Infrastructure/Bmz.LabTests.Infrastructure.csproj" />
+  </Folder>
+</Solution>

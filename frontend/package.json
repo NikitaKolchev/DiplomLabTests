@@ -1,0 +1,42 @@
+{
+  "name": "bmz-labtests-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx tsc --noEmit && npx vite build",
+    "preview": "npx vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "@ant-design/plots": "^2.6.8",
+    "antd": "^5.27.1",
+    "apexcharts": "^5.10.1",
+    "axios": "^1.12.2",
+    "dayjs": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "react": "^18.3.1",
+    "react-apexcharts": "^2.1.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jsdom": "^28.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^29.0.0",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.10",
+    "vitest": "^4.1.0"
+  }
+}

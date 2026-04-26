@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.git/
+**/.vs/
+**/.vscode/
+**/*.user
+**/frontend/dist/
+frontend/node_modules/
