@@ -5,4 +5,9 @@
     <Project Path="src/Bmz.LabTests.Domain/Bmz.LabTests.Domain.csproj" />
     <Project Path="src/Bmz.LabTests.Infrastructure/Bmz.LabTests.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Bmz.LabTests.API.UnitTests/Bmz.LabTests.API.UnitTests.csproj" />
+    <Project Path="tests/Bmz.LabTests.Application.UnitTests/Bmz.LabTests.Application.UnitTests.csproj" />
+    <Project Path="tests/Bmz.LabTests.Domain.UnitTests/Bmz.LabTests.Domain.UnitTests.csproj" />
+  </Folder>
 </Solution>

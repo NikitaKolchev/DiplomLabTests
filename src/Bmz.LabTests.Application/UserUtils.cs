@@ -4,7 +4,7 @@ public static partial class UserUtils
 {
     public static string Transliterate(string text)
     {
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var map = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["а"] = "a", ["б"] = "b", ["в"] = "v", ["г"] = "g", ["д"] = "d", ["е"] = "e", ["ё"] = "yo",
             ["ж"] = "zh", ["з"] = "z", ["и"] = "i", ["й"] = "j", ["к"] = "k", ["л"] = "l", ["м"] = "m",

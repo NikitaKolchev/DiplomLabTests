@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Bmz.LabTests.API.Middlewares;
 
@@ -40,6 +41,7 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
             Detail = statusCode >= 500 ? "Произошла непредвиденная ошибка сервера." : exception.Message
         };
 
-        await context.Response.WriteAsJsonAsync(details);
+        var json = JsonSerializer.Serialize(details);
+        await context.Response.WriteAsync(json);
     }
 }
