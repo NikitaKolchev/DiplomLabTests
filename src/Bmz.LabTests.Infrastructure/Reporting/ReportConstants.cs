@@ -1,5 +1,9 @@
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
+/// <summary>
+/// Глобальные константы и настройки для формирования отчетов.
+/// Включает названия организации и цветовую схему оформления документов.
+/// </summary>
 public static class ReportConstants
 {
     public const string CompanyName = "ОАО «БМЗ» — Сталепроволочный цех";

@@ -5,11 +5,19 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для технических операций и обслуживания системы.
+/// Содержит инструменты для разработчиков и администраторов.
+/// </summary>
 [ApiController]
 [Route("api/maintenance")]
 [Authorize(Roles = Roles.Admin)]
 public sealed class MaintenanceController(IDataGeneratorService dataGeneratorService) : ApiControllerBase
 {
+    /// <summary>
+    /// Генерирует указанное количество демонстрационных данных (результатов испытаний).
+    /// Используется для нагрузочного тестирования и наполнения базы данных.
+    /// </summary>
     [HttpPost("generate-data")]
     public async Task<IActionResult> GenerateData([FromQuery] int count, CancellationToken cancellationToken)
     {

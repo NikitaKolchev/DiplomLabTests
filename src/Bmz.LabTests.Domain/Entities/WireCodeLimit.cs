@@ -2,6 +2,9 @@ using Bmz.LabTests.Domain.Common;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность, определяющая нормы (допустимые границы) для конкретного параметра в рамках шифра проволоки.
+/// </summary>
 public sealed class WireCodeLimit : BaseEntity
 {
     public int WireCodeId { get; set; }

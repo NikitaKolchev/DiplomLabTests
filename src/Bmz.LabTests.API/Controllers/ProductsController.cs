@@ -9,6 +9,10 @@ using System.Security.Claims;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для работы с реестром готовой продукции.
+/// Предоставляет информацию о завершенных испытаниях, включая годные партии и брак.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{Roles.Admin},{Roles.Engineer}")]
@@ -18,6 +22,9 @@ public sealed class ProductsController(
     IReferenceDataService referenceDataService,
     ICurrentUserService currentUser) : ApiControllerBase
 {
+    /// <summary>
+    /// Получает доступные значения для фильтрации реестра продукции.
+    /// </summary>
     [HttpGet("filters")]
     public async Task<IActionResult> GetFilters(CancellationToken cancellationToken)
     {
@@ -37,6 +44,9 @@ public sealed class ProductsController(
         });
     }
 
+    /// <summary>
+    /// Возвращает список готовой продукции (завершенных испытаний) с фильтрацией, поиском и пагинацией.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] DateTime? fromUtc,

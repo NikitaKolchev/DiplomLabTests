@@ -7,6 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер аутентификации.
+/// Обеспечивает вход в систему и получение информации о текущем пользователе.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public sealed class AuthController(
@@ -14,6 +18,9 @@ public sealed class AuthController(
     IUserRepository userRepository,
     ICurrentUserService currentUser) : ApiControllerBase
 {
+    /// <summary>
+    /// Возвращает профиль текущего авторизованного пользователя.
+    /// </summary>
     [HttpGet("me")]
     [Authorize]
     public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
@@ -34,6 +41,9 @@ public sealed class AuthController(
         });
     }
 
+    /// <summary>
+    /// Выполняет аутентификацию пользователя и возвращает JWT токен.
+    /// </summary>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

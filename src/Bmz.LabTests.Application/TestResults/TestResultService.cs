@@ -9,6 +9,10 @@ using Bmz.LabTests.Domain.Enums;
 
 namespace Bmz.LabTests.Application.TestResults;
 
+/// <summary>
+/// Реализация сервиса управления протоколами испытаний.
+/// Обрабатывает бизнес-логику, разграничение прав доступа и взаимодействие с репозиториями.
+/// </summary>
 public sealed class TestResultService(
     ITestResultRepository repository,
     IUserRepository userRepository,
@@ -16,6 +20,11 @@ public sealed class TestResultService(
 {
     private Result<int?>? _cachedLaboratoryScope;
 
+    /// <summary>
+    /// Получает список протоколов с фильтрацией.
+    /// Реализует логику "видимости": обычные пользователи видят только протоколы своей лаборатории,
+    /// администраторы видят всё.
+    /// </summary>
     public async Task<Result<PaginatedListDto<TestResultListItemDto>>> GetListAsync(
         int currentUserId,
         string currentRole,
@@ -32,12 +41,14 @@ public sealed class TestResultService(
     {
         try
         {
+            // Определяем область видимости (лабораторию) для текущего пользователя
             var laboratoryIdResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
             if (!laboratoryIdResult.IsSuccess)
                 return Result.Failure<PaginatedListDto<TestResultListItemDto>>(laboratoryIdResult.Error);
 
             var laboratoryIdFilter = laboratoryIdResult.Value;
 
+            // Формируем спецификацию поиска
             var spec = new TestResultSearchSpecification(
                 laboratoryIdFilter,
                 fromUtc,
@@ -50,6 +61,7 @@ public sealed class TestResultService(
                 sortBy,
                 sortDesc);
 
+            // Выполняем запрос к БД
             var (items, totalCount) = await repository.GetListAsync(spec, cancellationToken);
 
             var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -74,8 +86,12 @@ public sealed class TestResultService(
         }
     }
 
+    /// <summary>
+    /// Создает новый протокол. Только пользователи с ролью Assistant могут создавать протоколы.
+    /// </summary>
     public async Task<Result<CreatedTestResultDto>> CreateAsync(int currentUserId, string currentRole, CreateTestResultDto request, CancellationToken cancellationToken)
     {
+        // Проверка существования шифра
         if (!await repository.WireCodeExistsAsync(request.WireCodeId, cancellationToken))
         {
             return Result.Failure<CreatedTestResultDto>("Указанный код проволоки не существует.");
@@ -85,6 +101,7 @@ public sealed class TestResultService(
         if (currentUser is null)
             return Result.Failure<CreatedTestResultDto>(Error.NotFound("Текущий пользователь не найден."));
 
+        // Привязываем протокол к лаборатории создателя
         var laboratoryId = currentUser.LaboratoryId ?? 0;
         if (string.Equals(currentRole, Roles.Assistant, StringComparison.OrdinalIgnoreCase) && laboratoryId == 0)
         {
@@ -111,12 +128,16 @@ public sealed class TestResultService(
             Convert.ToBase64String(entity.RowVersion)));
     }
 
+    /// <summary>
+    /// Получает детали протокола с проверкой прав доступа.
+    /// </summary>
     public async Task<Result<TestResultDetailsDto>> GetByIdAsync(int currentUserId, string currentRole, int id, CancellationToken cancellationToken)
     {
         var item = await repository.GetByIdWithValuesAsync(id, cancellationToken);
         if (item is null)
             return Result.Failure<TestResultDetailsDto>(Error.NotFound("Результат испытания не найден."));
 
+        // Проверка прав: нельзя смотреть протокол чужой лаборатории (кроме админа)
         var laboratoryIdResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
         if (!laboratoryIdResult.IsSuccess)
             return Result.Failure<TestResultDetailsDto>(laboratoryIdResult.Error);
@@ -142,8 +163,13 @@ public sealed class TestResultService(
             item.Values.Select(v => new TestResultValueDto(v.ParameterId, v.Value)).ToArray()));
     }
 
+    /// <summary>
+    /// Сохраняет значения измерений. 
+    /// Реализует оптимистичную блокировку через RowVersion.
+    /// </summary>
     public async Task<Result<SavedTestResultDto>> SaveValuesAsync(int currentUserId, string currentRole, int id, SaveTestValuesDto request, CancellationToken cancellationToken)
     {
+        // Декодируем RowVersion из Base64 для передачи в EF
         if (!TryParseRowVersion(request.RowVersion, out var rowVersion))
         {
             return Result.Failure<SavedTestResultDto>("RowVersion не является корректной Base64-строкой.");
@@ -155,6 +181,7 @@ public sealed class TestResultService(
             return Result.Failure<SavedTestResultDto>(Error.NotFound("Результат испытания не найден."));
         }
 
+        // Проверка прав на редактирование
         if (IsLaboratoryScopedRole(currentRole))
         {
             var labResult = await ResolveLaboratoryScopeAsync(currentUserId, currentRole, cancellationToken);
@@ -172,8 +199,10 @@ public sealed class TestResultService(
             return Result.Failure<SavedTestResultDto>("Завершенный результат испытания нельзя редактировать.");
         }
 
+        // Устанавливаем оригинальный RowVersion для проверки конкурентного доступа в EF
         repository.SetOriginalRowVersion(testResult, rowVersion);
 
+        // Проверка, что передаваемые параметры допустимы для данного шифра
         var allowedParameterIds = await repository.GetAllowedParameterIdsAsync(testResult.WireCodeId, cancellationToken);
         var notAllowed = request.Values.Select(x => x.ParameterId).Except(allowedParameterIds).ToArray();
         if (notAllowed.Length > 0)
@@ -191,6 +220,9 @@ public sealed class TestResultService(
         return Result.Success(new SavedTestResultDto(testResult.Id, testResult.UpdatedAtUtc, Convert.ToBase64String(testResult.RowVersion)));
     }
 
+    /// <summary>
+    /// Завершает протокол и делегирует проверку норм специализированному сервису.
+    /// </summary>
     public async Task<Result<CompletionResult>> CompleteAsync(int currentUserId, string currentRole, int id, string rowVersionBase64, CancellationToken cancellationToken)
     {
         if (!TryParseRowVersion(rowVersionBase64, out var rowVersion))
@@ -219,6 +251,9 @@ public sealed class TestResultService(
         return await completionService.CompleteAsync(id, rowVersion, cancellationToken);
     }
 
+    /// <summary>
+    /// Удаляет протокол. Доступно только администратору.
+    /// </summary>
     public async Task<Result> DeleteAsync(int currentUserId, string currentRole, int id, CancellationToken cancellationToken)
     {
         if (!string.Equals(currentRole, Roles.Admin, StringComparison.OrdinalIgnoreCase))
@@ -234,6 +269,9 @@ public sealed class TestResultService(
         return Result.Success();
     }
 
+    /// <summary>
+    /// Вспомогательный метод для парсинга RowVersion из строки Base64.
+    /// </summary>
     private static bool TryParseRowVersion(string base64, out byte[] rowVersion)
     {
         try

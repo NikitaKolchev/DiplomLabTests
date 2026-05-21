@@ -8,10 +8,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Products;
 
+/// <summary>
+/// Сервис для работы с реестром готовой продукции и забракованных партий.
+/// Обеспечивает фильтрацию и поиск по завершенным испытаниям.
+/// </summary>
 public sealed class ProductService(
     ApplicationDbContext dbContext,
     IUserRepository userRepository) : IProductService
 {
+    /// <summary>
+    /// Получает список продукции с учетом прав доступа пользователя (инженеры видят только свою лабораторию).
+    /// </summary>
     public async Task<Result<PaginatedListDto<ProductListItemDto>>> GetProductsAsync(
         int currentUserId,
         string currentRole,

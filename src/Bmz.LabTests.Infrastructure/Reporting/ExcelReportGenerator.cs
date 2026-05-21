@@ -7,8 +7,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
+/// <summary>
+/// Генератор отчетов в формате Microsoft Excel (XLSX).
+/// Использует библиотеку ClosedXML для формирования табличных журналов.
+/// </summary>
 public sealed class ExcelReportGenerator(ApplicationDbContext dbContext)
 {
+    /// <summary>
+    /// Генерирует ежемесячный журнал за указанный год и месяц.
+    /// </summary>
     public async Task<Result<ReportFile>> GenerateMonthlyJournalExcelAsync(int year, int month, CancellationToken cancellationToken)
     {
         var from = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -16,6 +23,9 @@ public sealed class ExcelReportGenerator(ApplicationDbContext dbContext)
         return await GenerateDetailedJournalExcelAsync(from, to, null, null, cancellationToken);
     }
 
+    /// <summary>
+    /// Формирует подробный журнал испытаний с гибкой фильтрацией и форматированием.
+    /// </summary>
     public async Task<Result<ReportFile>> GenerateDetailedJournalExcelAsync(
         DateTime fromUtc,
         DateTime toUtc,

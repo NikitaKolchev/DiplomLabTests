@@ -7,11 +7,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для инженеров по управлению персоналом своей лаборатории.
+/// Позволяет инженеру просматривать и редактировать лаборантов, закрепленных за его подразделением.
+/// </summary>
 [ApiController]
 [Route("api/engineer")]
 [Authorize(Roles = Roles.Engineer)]
 public sealed class EngineerOrganizationController(IUserManagementService userManagementService) : ApiControllerBase
 {
+    /// <summary>
+    /// Возвращает список лаборантов текущей лаборатории.
+    /// </summary>
     [HttpGet("users/assistants")]
     public async Task<IActionResult> GetAssistants([FromQuery] string? search, [FromQuery] string? login, CancellationToken cancellationToken)
     {
@@ -21,6 +28,9 @@ public sealed class EngineerOrganizationController(IUserManagementService userMa
         return ToActionResult(await userManagementService.GetAssistantsForEngineerAsync(engineerUserId, search, login, cancellationToken));
     }
 
+    /// <summary>
+    /// Создает новую учетную запись лаборанта в текущей лаборатории.
+    /// </summary>
     [HttpPost("users/assistants")]
     public async Task<IActionResult> CreateAssistant([FromBody] CreateAssistantByEngineerRequest request, CancellationToken cancellationToken)
     {
@@ -36,6 +46,9 @@ public sealed class EngineerOrganizationController(IUserManagementService userMa
             cancellationToken));
     }
 
+    /// <summary>
+    /// Обновляет данные лаборанта текущей лаборатории.
+    /// </summary>
     [HttpPut("users/assistants/{assistantId:int}")]
     public async Task<IActionResult> UpdateAssistant(int assistantId, [FromBody] UpdateAssistantRequest request, CancellationToken cancellationToken)
     {

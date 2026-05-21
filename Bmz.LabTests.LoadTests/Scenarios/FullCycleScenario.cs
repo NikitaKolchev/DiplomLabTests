@@ -8,6 +8,11 @@ using System.Text.Json;
 
 namespace Bmz.LabTests.LoadTests.Scenarios;
 
+/// <summary>
+/// Сценарий "Полный цикл".
+/// Моделирует сквозной процесс: создание протокола -> получение параметров -> внесение данных -> завершение испытания.
+/// Это самый тяжелый сценарий, максимально нагружающий бизнес-логику и базу данных.
+/// </summary>
 public static class FullCycleScenario
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -15,11 +20,15 @@ public static class FullCycleScenario
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Создает конфигурацию сценария.
+    /// Модель нагрузки: Inject (2 новых пользователя в секунду).
+    /// </summary>
     public static ScenarioProps Build(HttpClient httpClient, string token)
     {
         return Scenario.Create("ПолныйЦикл", async context =>
         {
-            // Шаг 1: GET /api/wire-codes — получить справочники.
+            // Шаг 1: Получение справочника шифров для начала работы.
             var wireCodesStep = await Step.Run<List<WireCodeDto>>("Справочник кодов", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.WireCodes());
@@ -36,9 +45,10 @@ public static class FullCycleScenario
 
             var wireCode = wireCodes[Random.Shared.Next(0, wireCodes.Count)];
 
+            // Имитация времени на раздумья пользователя
             await Task.Delay(500);
 
-            // Шаг 2: POST /api/testresults — создать протокол, сохранить id.
+            // Шаг 2: Создание нового протокола испытаний.
             var createStep = await Step.Run<CreatedTestResultDto>("Создание протокола", context, async () =>
             {
                 var dto = new CreateTestResultRequest
@@ -64,7 +74,7 @@ public static class FullCycleScenario
 
             await Task.Delay(500);
 
-            // Шаг 3: GET /api/testresults/{id} — получить детали и RowVersion.
+            // Шаг 3: Получение деталей только что созданного протокола для получения RowVersion.
             var detailsStep = await Step.Run<TestResultDetailsDto>("Детали протокола", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.TestResultById(created.Id));
@@ -79,7 +89,7 @@ public static class FullCycleScenario
 
             await Task.Delay(500);
 
-            // Шаг 4: GET /api/parameters — получить параметры.
+            // Шаг 4: Получение справочника всех параметров.
             var parametersStep = await Step.Run<List<ParameterDto>>("Параметры", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.Parameters());
@@ -92,7 +102,7 @@ public static class FullCycleScenario
 
             await Task.Delay(500);
 
-            // Дополнительный шаг: получить схему ввода для генерации корректных данных.
+            // Дополнительный шаг: Получение схемы полей ввода для генерации корректных данных.
             var schemaStep = await Step.Run<WireCodeInputSchemaDto>("Схема ввода", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.InputFields(details.WireCodeId));
@@ -109,7 +119,7 @@ public static class FullCycleScenario
 
             await Task.Delay(500);
 
-            // Шаг 5: PUT /api/testresults/{id}/values — внести значения измерений.
+            // Шаг 5: Внесение значений измерений (PUT /api/testresults/{id}/values).
             var saveStep = await Step.Run<SavedTestResultDto>("Внесение значений", context, async () =>
             {
                 var payload = new SaveTestValuesRequest
@@ -134,7 +144,7 @@ public static class FullCycleScenario
 
             await Task.Delay(500);
 
-            // Шаг 6: POST /api/testresults/{id}/complete — завершить протокол.
+            // Шаг 6: Завершение протокола (перевод в статус Completed).
             var completeStep = await Step.Run<object>("Завершение протокола", context, async () =>
             {
                 var completePayload = new CompleteTestResultRequest { RowVersion = saved.RowVersion };

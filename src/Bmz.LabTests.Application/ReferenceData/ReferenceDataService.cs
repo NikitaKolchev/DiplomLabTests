@@ -6,8 +6,15 @@ using Bmz.LabTests.Domain.Enums;
 
 namespace Bmz.LabTests.Application.ReferenceData;
 
+/// <summary>
+/// Сервис для работы со справочниками системы.
+/// Управляет данными стран, потребителей, кодов проволоки и параметров испытаний.
+/// </summary>
 public sealed class ReferenceDataService(IReferenceDataRepository repository) : IReferenceDataService
 {
+    /// <summary>
+    /// Возвращает список стран с возможностью поиска.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<CountryDto>>> GetCountriesAsync(string? searchTerm, CancellationToken cancellationToken)
     {
         var countries = await repository.GetCountriesAsync(searchTerm, cancellationToken);
@@ -15,6 +22,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success<IReadOnlyCollection<CountryDto>>(dtos);
     }
 
+    /// <summary>
+    /// Получает данные конкретной страны по ID.
+    /// </summary>
     public async Task<Result<CountryDto>> GetCountryByIdAsync(int id, CancellationToken cancellationToken)
     {
         var country = await repository.GetCountryByIdAsync(id, cancellationToken);
@@ -26,6 +36,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success(new CountryDto(country.Id, country.Name));
     }
 
+    /// <summary>
+    /// Добавляет новую страну в справочник.
+    /// </summary>
     public async Task<Result<CountryDto>> CreateCountryAsync(string name, CancellationToken cancellationToken)
     {
         try
@@ -41,6 +54,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Обновляет название страны.
+    /// </summary>
     public async Task<Result<CountryDto>> UpdateCountryAsync(int id, string name, CancellationToken cancellationToken)
     {
         try
@@ -61,6 +77,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Удаляет страну из справочника.
+    /// </summary>
     public async Task<Result> DeleteCountryAsync(int id, CancellationToken cancellationToken)
     {
         try
@@ -81,6 +100,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Возвращает список потребителей (заказчиков).
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<CustomerDto>>> GetCustomersAsync(string? searchTerm, CancellationToken cancellationToken)
     {
         var customers = await repository.GetCustomersAsync(searchTerm, cancellationToken);
@@ -88,6 +110,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success<IReadOnlyCollection<CustomerDto>>(dtos);
     }
 
+    /// <summary>
+    /// Получает данные потребителя по ID.
+    /// </summary>
     public async Task<Result<CustomerDto>> GetCustomerByIdAsync(int id, CancellationToken cancellationToken)
     {
         var customer = await repository.GetCustomerByIdAsync(id, cancellationToken);
@@ -99,6 +124,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success(new CustomerDto(customer.Id, customer.Name, customer.CountryId, customer.Country?.Name));
     }
 
+    /// <summary>
+    /// Регистрирует нового потребителя.
+    /// </summary>
     public async Task<Result<CustomerDto>> CreateCustomerAsync(string name, int? countryId, CancellationToken cancellationToken)
     {
         try
@@ -131,6 +159,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Обновляет данные потребителя.
+    /// </summary>
     public async Task<Result<CustomerDto>> UpdateCustomerAsync(int id, string name, int? countryId, CancellationToken cancellationToken)
     {
         try
@@ -164,6 +195,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Удаляет потребителя.
+    /// </summary>
     public async Task<Result> DeleteCustomerAsync(int id, CancellationToken cancellationToken)
     {
         try
@@ -184,6 +218,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Возвращает список кодов (шифров) проволоки.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<WireCodeDto>>> GetWireCodesAsync(string? searchTerm, CancellationToken cancellationToken)
     {
         var wireCodes = await repository.GetWireCodesAsync(searchTerm, cancellationToken);
@@ -191,6 +228,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success<IReadOnlyCollection<WireCodeDto>>(dtos);
     }
 
+    /// <summary>
+    /// Получает данные кода проволоки по ID.
+    /// </summary>
     public async Task<Result<WireCodeDto>> GetWireCodeByIdAsync(int id, CancellationToken cancellationToken)
     {
         var wireCode = await repository.GetWireCodeByIdAsync(id, cancellationToken);
@@ -202,6 +242,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success(new WireCodeDto(wireCode.Id, wireCode.Code, wireCode.Marking, wireCode.Diameter));
     }
 
+    /// <summary>
+    /// Создает новый код проволоки.
+    /// </summary>
     public async Task<Result<WireCodeDto>> CreateWireCodeAsync(string code, string marking, decimal diameter, CancellationToken cancellationToken)
     {
         try
@@ -229,6 +272,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Обновляет данные кода проволоки.
+    /// </summary>
     public async Task<Result<WireCodeDto>> UpdateWireCodeAsync(int id, string code, string marking, decimal diameter, CancellationToken cancellationToken)
     {
         try
@@ -258,6 +304,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Удаляет код проволоки.
+    /// </summary>
     public async Task<Result> DeleteWireCodeAsync(int id, CancellationToken cancellationToken)
     {
         try
@@ -278,6 +327,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Возвращает список параметров испытаний.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<ParameterDto>>> GetParametersAsync(string? searchTerm, CancellationToken cancellationToken)
     {
         var parameters = await repository.GetParametersAsync(searchTerm, cancellationToken);
@@ -285,6 +337,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success<IReadOnlyCollection<ParameterDto>>(dtos);
     }
 
+    /// <summary>
+    /// Получает данные параметра по ID.
+    /// </summary>
     public async Task<Result<ParameterDto>> GetParameterByIdAsync(int id, CancellationToken cancellationToken)
     {
         var parameter = await repository.GetParameterByIdAsync(id, cancellationToken);
@@ -296,6 +351,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         return Result.Success(new ParameterDto(parameter.Id, parameter.Name, parameter.DataType, parameter.Unit));
     }
 
+    /// <summary>
+    /// Создает новый параметр испытания.
+    /// </summary>
     public async Task<Result<ParameterDto>> CreateParameterAsync(string name, ParameterDataType dataType, string? unit, CancellationToken cancellationToken)
     {
         try
@@ -317,6 +375,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Обновляет данные параметра.
+    /// </summary>
     public async Task<Result<ParameterDto>> UpdateParameterAsync(int id, string name, ParameterDataType dataType, string? unit, CancellationToken cancellationToken)
     {
         try
@@ -340,6 +401,9 @@ public sealed class ReferenceDataService(IReferenceDataRepository repository) : 
         }
     }
 
+    /// <summary>
+    /// Удаляет параметр из справочника.
+    /// </summary>
     public async Task<Result> DeleteParameterAsync(int id, CancellationToken cancellationToken)
     {
         try

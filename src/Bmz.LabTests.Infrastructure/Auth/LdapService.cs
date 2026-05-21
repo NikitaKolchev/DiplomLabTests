@@ -6,10 +6,17 @@ using System.Linq;
 
 namespace Bmz.LabTests.Infrastructure.Auth;
 
+/// <summary>
+/// Сервис для интеграции с Active Directory (LDAP).
+/// Позволяет проверять доменные учетные данные пользователей.
+/// </summary>
 public sealed class LdapService(IOptions<LdapOptions> options) : ILdapService
 {
     private readonly LdapOptions _options = options.Value;
 
+    /// <summary>
+    /// Проверяет корректность пары логин/пароль в домене.
+    /// </summary>
     public async Task<Result<bool>> ValidateCredentialsAsync(string username, string password, CancellationToken cancellationToken)
     {
         try
@@ -30,6 +37,9 @@ public sealed class LdapService(IOptions<LdapOptions> options) : ILdapService
         }
     }
 
+    /// <summary>
+    /// Запрашивает информацию о пользователе (ФИО, email) из Active Directory.
+    /// </summary>
     public async Task<Result<LdapUserInfo>> GetUserInfoAsync(string username, CancellationToken cancellationToken)
     {
         try
@@ -76,6 +86,9 @@ public sealed class LdapService(IOptions<LdapOptions> options) : ILdapService
         }
     }
 
+    /// <summary>
+    /// Создает и настраивает TCP-соединение с LDAP-сервером.
+    /// </summary>
     private async Task<LdapConnection> CreateConnectionAsync(CancellationToken cancellationToken)
     {
         var connection = new LdapConnection();

@@ -9,12 +9,19 @@ using QuestPDF.Infrastructure;
 
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
+/// <summary>
+/// Генератор отчетов в формате PDF.
+/// Использует библиотеку QuestPDF для создания документов с богатым визуальным оформлением (графики, таблицы, карточки).
+/// </summary>
 public sealed class PdfReportGenerator(ApplicationDbContext dbContext)
 {
     private const string CompanyName = "ОАО «БМЗ» — Управляющая компания холдинга «БМК»";
     private const string DepartmentName = "Сталепроволочный цех №1 — Испытательная лаборатория";
     private const string ReportTitle = "Система регистрации лабораторных испытаний";
 
+    /// <summary>
+    /// Генерирует статистический отчет с показателями качества, динамикой испытаний и анализом брака.
+    /// </summary>
     public async Task<Result<ReportFile>> GenerateStatisticsPdfAsync(
         DateTime fromUtc,
         DateTime toUtc,
@@ -248,10 +255,10 @@ public sealed class PdfReportGenerator(ApplicationDbContext dbContext)
                             row.RelativeItem().Text($"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
                             row.RelativeItem().AlignRight().Text(x =>
                             {
-                                x.Span("Страница ").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
-                                x.CurrentPageNumber().FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
-                                x.Span(" из ").FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
-                                x.TotalPages().FontSize(8).FontColor(Color.FromHex(ReportConstants.MutedColor));
+                                x.Span("Страница ").FontSize(8);
+                                x.CurrentPageNumber().FontSize(8);
+                                x.Span(" из ").FontSize(8);
+                                x.TotalPages().FontSize(8);
                             });
                         });
                     });
@@ -267,10 +274,13 @@ public sealed class PdfReportGenerator(ApplicationDbContext dbContext)
         }
         catch (Exception ex)
         {
-            return Result.Failure<ReportFile>($"Ошибка при генерации PDF: {ex.Message}");
+            return Result.Failure<ReportFile>($"Ошибка при генерации PDF-отчета: {ex.Message}");
         }
     }
 
+    /// <summary>
+    /// Создает официальный сертификат испытаний для конкретной партии проволоки.
+    /// </summary>
     public async Task<Result<ReportFile>> GenerateBatchCertificatePdfAsync(int testResultId, CancellationToken cancellationToken)
     {
         try

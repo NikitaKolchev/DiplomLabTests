@@ -1,5 +1,8 @@
 namespace Bmz.LabTests.Infrastructure.Auth;
 
+/// <summary>
+/// Параметры конфигурации для генерации и валидации JWT токенов.
+/// </summary>
 public sealed class JwtOptions
 {
     public const string SectionName = "Jwt";

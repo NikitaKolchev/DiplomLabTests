@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Persistence.Seeding;
 
+/// <summary>
+/// Инициализатор учетной записи администратора по умолчанию.
+/// Создает локального пользователя с полными правами при первом запуске системы.
+/// </summary>
 public sealed class AdminSeeder(IPasswordHasher passwordHasher) : IEntitySeeder
 {
     private const string LocalAdminLogin = "local-admin";
@@ -13,6 +17,9 @@ public sealed class AdminSeeder(IPasswordHasher passwordHasher) : IEntitySeeder
 
     public int Order => 2;
 
+    /// <summary>
+    /// Проверяет наличие администратора и создает его, если он отсутствует.
+    /// </summary>
     public async Task<Result> SeedAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
         try

@@ -5,11 +5,19 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для получения статистических данных о проведенных испытаниях.
+/// Предоставляет агрегированную информацию для дашбордов и аналитики.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{Roles.Admin},{Roles.Engineer}")]
 public sealed class StatisticsController(IStatisticsService statisticsService) : ApiControllerBase
 {
+    /// <summary>
+    /// Получает расширенную статистику испытаний за указанный период.
+    /// Включает общие показатели, срезы по лабораториям, продукции и тренды.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> Get(
         [FromQuery] DateTime fromUtc,

@@ -1,5 +1,8 @@
 namespace Bmz.LabTests.Domain.Common;
 
+/// <summary>
+/// Перечисление типов ошибок для более точной обработки в слое API (маппинг на HTTP статусы).
+/// </summary>
 public enum ErrorType
 {
     None = 0,
@@ -11,6 +14,10 @@ public enum ErrorType
     Forbidden = 6
 }
 
+/// <summary>
+/// Объект ошибки, содержащий тип и текстовое описание.
+/// Используется в связке с классом Result для функциональной обработки ошибок без исключений.
+/// </summary>
 public record Error(ErrorType Type, string Message)
 {
     public static Error None => new(ErrorType.None, string.Empty);

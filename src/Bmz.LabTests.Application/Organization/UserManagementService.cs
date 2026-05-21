@@ -8,15 +8,28 @@ using Bmz.LabTests.Domain.Entities;
 
 namespace Bmz.LabTests.Application.Organization;
 
+/// <summary>
+/// Сервис управления пользователями системы.
+/// Обеспечивает операции по созданию, обновлению и удалению учетных записей персонала (инженеров и ассистентов).
+/// </summary>
 public sealed class UserManagementService(
     IOrganizationRepository repository,
     IPasswordHasher passwordHasher,
     IAuditService auditService) : IUserManagementService
 {
+    /// <summary>
+    /// Выполняет транслитерацию ФИО для автоматической генерации логина.
+    /// </summary>
     public string TransliterateLogin(string fullName) => UserUtils.Transliterate(fullName);
 
+    /// <summary>
+    /// Генерирует надежный случайный пароль.
+    /// </summary>
     public string GeneratePassword(int length = 10) => UserUtils.GeneratePassword(length);
 
+    /// <summary>
+    /// Изменяет роль пользователя в системе (например, повышение Ассистента до Инженера).
+    /// </summary>
     public async Task<Result<UserSummaryDto>> UpdateUserRoleAsync(int actorUserId, string? actorLogin, int userId, string newRoleName, CancellationToken cancellationToken)
     {
         try
@@ -48,6 +61,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Создает локальную учетную запись инженера.
+    /// </summary>
     public async Task<Result<UserSummaryDto>> CreateEngineerAsync(int actorUserId, string? actorLogin, string fullName, string login, string password, int? laboratoryId, CancellationToken cancellationToken)
     {
         try
@@ -97,6 +113,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Возвращает список всех инженеров в системе.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<UserSummaryDto>>> GetEngineersAsync(CancellationToken cancellationToken)
     {
         var engineers = await repository.GetEngineersAsync(cancellationToken);
@@ -104,6 +123,9 @@ public sealed class UserManagementService(
         return Result.Success<IReadOnlyCollection<UserSummaryDto>>(dtos);
     }
 
+    /// <summary>
+    /// Обновляет данные инженера (ФИО, логин, пароль, привязка к лаборатории).
+    /// </summary>
     public async Task<Result<UserSummaryDto>> UpdateEngineerAsync(int actorUserId, string? actorLogin, int engineerId, string fullName, string login, string? password, int? laboratoryId, CancellationToken cancellationToken)
     {
         try
@@ -150,6 +172,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Безвозвратно удаляет учетную запись инженера.
+    /// </summary>
     public async Task<Result> DeleteEngineerAsync(int actorUserId, string? actorLogin, int engineerId, CancellationToken cancellationToken)
     {
         try
@@ -171,6 +196,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Создает учетную запись лаборанта (Ассистента) и привязывает его к конкретной лаборатории.
+    /// </summary>
     public async Task<Result<UserSummaryDto>> CreateAssistantByAdminAsync(int actorUserId, string? actorLogin, string fullName, string login, string password, int laboratoryId, CancellationToken cancellationToken)
     {
         try
@@ -216,6 +244,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Возвращает список всех ассистентов (лаборантов) в системе.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<UserSummaryDto>>> GetAssistantsForAdminAsync(CancellationToken cancellationToken)
     {
         var assistants = await repository.GetAssistantsAsync(cancellationToken);
@@ -223,6 +254,9 @@ public sealed class UserManagementService(
         return Result.Success<IReadOnlyCollection<UserSummaryDto>>(dtos);
     }
 
+    /// <summary>
+    /// Обновляет данные лаборанта.
+    /// </summary>
     public async Task<Result<UserSummaryDto>> UpdateAssistantByAdminAsync(int actorUserId, string? actorLogin, int assistantId, string fullName, string login, string? password, int laboratoryId, CancellationToken cancellationToken)
     {
         try
@@ -249,15 +283,18 @@ public sealed class UserManagementService(
             }
 
             await repository.SaveChangesAsync(cancellationToken);
-            await auditService.WriteAsync(actorUserId, actorLogin, "Update", "User", assistantId.ToString(), $"Admin updated Assistant '{assistant.Login}'", cancellationToken);
+            await auditService.WriteAsync(actorUserId, actorLogin, "Update", "User", assistantId.ToString(), $"Updated Assistant '{assistant.Login}'", cancellationToken);
             return Result.Success(new UserSummaryDto(assistant.Id, assistant.FullName, assistant.Login, Roles.Assistant, assistant.LaboratoryId));
         }
         catch (Exception ex)
         {
-            return Result.Failure<UserSummaryDto>($"Ошибка при обновлении лаборанта администратором: {ex.Message}");
+            return Result.Failure<UserSummaryDto>($"Ошибка при обновлении лаборанта: {ex.Message}");
         }
     }
 
+    /// <summary>
+    /// Удаляет лаборанта из системы.
+    /// </summary>
     public async Task<Result> DeleteAssistantAsync(int actorUserId, string? actorLogin, int assistantId, CancellationToken cancellationToken)
     {
         try
@@ -277,6 +314,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Позволяет инженеру создать лаборанта для своей лаборатории.
+    /// </summary>
     public async Task<Result<UserSummaryDto>> CreateAssistantByEngineerAsync(int engineerUserId, string? actorLogin, string fullName, string login, string password, CancellationToken cancellationToken)
     {
         try
@@ -323,6 +363,9 @@ public sealed class UserManagementService(
         }
     }
 
+    /// <summary>
+    /// Возвращает список лаборантов, работающих в той же лаборатории, что и инженер.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<UserSummaryDto>>> GetAssistantsForEngineerAsync(int engineerUserId, string? search, string? login, CancellationToken cancellationToken)
     {
         var assistants = await repository.GetAssistantsForEngineerAsync(engineerUserId, search, login, cancellationToken);
@@ -330,6 +373,9 @@ public sealed class UserManagementService(
         return Result.Success<IReadOnlyCollection<UserSummaryDto>>(dtos);
     }
 
+    /// <summary>
+    /// Позволяет инженеру обновить данные лаборанта своей лаборатории.
+    /// </summary>
     public async Task<Result<UserSummaryDto>> UpdateAssistantByEngineerAsync(int engineerUserId, int assistantId, string fullName, string login, string? password, CancellationToken cancellationToken)
     {
         try

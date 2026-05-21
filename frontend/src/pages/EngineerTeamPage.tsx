@@ -139,7 +139,7 @@ export default function EngineerTeamPage() {
         </Form>
       </Card>
 
-      <Card title="Лаборатории">
+      <Card title="Лаборанты">
         <Table
           rowKey="id"
           dataSource={items}

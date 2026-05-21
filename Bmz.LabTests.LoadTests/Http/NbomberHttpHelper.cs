@@ -6,6 +6,10 @@ using System.Text.Json;
 
 namespace Bmz.LabTests.LoadTests.Http;
 
+/// <summary>
+/// Вспомогательный класс для выполнения HTTP-запросов и их интеграции с NBomber Response.
+/// Обеспечивает корректную обработку JSON, расчет размера ответа и логирование ошибок.
+/// </summary>
 public static class NbomberHttpHelper
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -13,11 +17,17 @@ public static class NbomberHttpHelper
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Устанавливает Bearer токен в заголовок Authorization.
+    /// </summary>
     public static void SetBearer(HttpRequestMessage request, string token)
     {
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
+    /// <summary>
+    /// Отправляет запрос и десериализует ответ из JSON в указанный тип T.
+    /// </summary>
     public static async Task<Response<T>> SendJsonAsync<T>(HttpClient httpClient, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
@@ -46,6 +56,9 @@ public static class NbomberHttpHelper
         }
     }
 
+    /// <summary>
+    /// Отправляет запрос без ожидания тела ответа (или когда тело не нужно десериализовать).
+    /// </summary>
     public static async Task<Response<object>> SendAsync(HttpClient httpClient, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
@@ -68,6 +81,10 @@ public static class NbomberHttpHelper
         }
     }
 
+    /// <summary>
+    /// Специальный метод для сценариев обновления, где 409 Conflict (оптимистичная блокировка) 
+    /// считается допустимым поведением, а не ошибкой теста.
+    /// </summary>
     public static async Task<Response<object>> SendAsyncTreat409AsOk(HttpClient httpClient, HttpRequestMessage request, CancellationToken cancellationToken)
     {
         try
@@ -77,6 +94,7 @@ public static class NbomberHttpHelper
 
             if (statusCode == 409)
             {
+                // При конкурентном доступе 409 — норма, помечаем как OK для статистики
                 return Response.Ok<object>(statusCode: "conflict");
             }
 
@@ -95,6 +113,9 @@ public static class NbomberHttpHelper
         }
     }
 
+    /// <summary>
+    /// Пытается получить размер контента ответа в байтах.
+    /// </summary>
     private static async Task<long> TryGetResponseSizeAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try
@@ -111,6 +132,9 @@ public static class NbomberHttpHelper
         }
     }
 
+    /// <summary>
+    /// Безопасно считывает тело ответа для включения в сообщение об ошибке.
+    /// </summary>
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try

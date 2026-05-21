@@ -2,6 +2,10 @@ using Bmz.LabTests.Domain.Common;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность "Брак".
+/// Создается автоматически при завершении протокола, если хотя бы один обязательный параметр не соответствует нормам.
+/// </summary>
 public sealed class Reject : BaseEntity
 {
     private Reject() { }

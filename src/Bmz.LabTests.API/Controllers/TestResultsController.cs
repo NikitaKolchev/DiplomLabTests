@@ -10,6 +10,10 @@ using System.Security.Claims;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для работы с протоколами испытаний.
+/// Предоставляет API для создания, поиска, обновления и завершения протоколов.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -17,6 +21,10 @@ public sealed class TestResultsController(
     ITestResultService service,
     ICurrentUserService currentUser) : ApiControllerBase
 {
+    /// <summary>
+    /// Получение списка протоколов с фильтрацией и пагинацией.
+    /// Доступно анонимно (для гостевого режима).
+    /// </summary>
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> GetAll(
@@ -31,6 +39,7 @@ public sealed class TestResultsController(
         [FromQuery] bool? sortDesc = null,
         CancellationToken cancellationToken = default)
     {
+        // Ограничение параметров пагинации для защиты от перегрузки
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 20;
         if (pageSize > 100) pageSize = 100;
@@ -50,6 +59,9 @@ public sealed class TestResultsController(
             cancellationToken));
     }
 
+    /// <summary>
+    /// Создание нового протокола. Доступно только ассистентам (лаборантам).
+    /// </summary>
     [HttpPost]
     [Authorize(Roles = Roles.Assistant)]
     public async Task<IActionResult> Create([FromBody] CreateTestResultRequest request, CancellationToken cancellationToken)
@@ -67,9 +79,13 @@ public sealed class TestResultsController(
         if (result.IsFailure)
             return ToActionResult(result);
 
+        // Возврат 201 Created с URL нового ресурса
         return CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value);
     }
 
+    /// <summary>
+    /// Получение деталей протокола по ID.
+    /// </summary>
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
@@ -77,6 +93,10 @@ public sealed class TestResultsController(
         return ToActionResult(result);
     }
 
+    /// <summary>
+    /// Сохранение значений измерений для протокола.
+    /// Обрабатывает конфликты параллельного доступа.
+    /// </summary>
     [HttpPut("{id:int}/values")]
     [Authorize(Roles = $"{Roles.Assistant},{Roles.Engineer},{Roles.Admin}")]
     public async Task<IActionResult> SaveValues(int id, [FromBody] SaveTestValuesRequest request, CancellationToken cancellationToken)
@@ -96,10 +116,14 @@ public sealed class TestResultsController(
         }
         catch (DbUpdateConcurrencyException)
         {
+            // Возврат 409 Conflict при попытке обновить устаревшую версию данных
             return Conflict("Протокол обновлен другим пользователем. Обновите страницу и повторите попытку.");
         }
     }
 
+    /// <summary>
+    /// Завершение испытания.
+    /// </summary>
     [HttpPost("{id:int}/complete")]
     [Authorize(Roles = $"{Roles.Assistant},{Roles.Engineer},{Roles.Admin}")]
     public async Task<IActionResult> Complete(int id, [FromBody] CompleteTestResultRequest request, CancellationToken cancellationToken)
@@ -115,6 +139,9 @@ public sealed class TestResultsController(
         }
     }
 
+    /// <summary>
+    /// Удаление протокола. Доступно только администраторам.
+    /// </summary>
     [HttpDelete("{id:int}")]
     [Authorize(Roles = Roles.Admin)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)

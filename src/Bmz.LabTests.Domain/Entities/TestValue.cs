@@ -2,9 +2,12 @@ using Bmz.LabTests.Domain.Common;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность конкретного значения измерения для параметра в рамках протокола.
+/// </summary>
 public sealed class TestValue : BaseEntity
 {
-    // EF requirement
+    // Требование Entity Framework Core
     private TestValue() { }
 
     public TestValue(int parameterId, string value)

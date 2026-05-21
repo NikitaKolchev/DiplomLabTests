@@ -8,17 +8,27 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для управления техническими нормами (лимитами) испытаний.
+/// Привязывает параметры и их допустимые границы к конкретным маркам проволоки.
+/// </summary>
 [ApiController]
 [Route("api/wire-codes/{wireCodeId:int}/limits")]
 [Authorize(Roles = $"{Roles.Admin},{Roles.Engineer}")]
 public sealed class LimitsController(IProtocolService service) : ApiControllerBase
 {
+    /// <summary>
+    /// Возвращает список всех настроенных норм для указанной марки проволоки.
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetForWireCode(int wireCodeId, CancellationToken cancellationToken)
     {
         return ToActionResult(await service.GetLimitsAsync(wireCodeId, cancellationToken));
     }
 
+    /// <summary>
+    /// Полностью обновляет (заменяет) список норм для марки проволоки.
+    /// </summary>
     [HttpPut]
     public async Task<IActionResult> ReplaceForWireCode(
         int wireCodeId,
@@ -36,6 +46,9 @@ public sealed class LimitsController(IProtocolService service) : ApiControllerBa
             cancellationToken));
     }
 
+    /// <summary>
+    /// Вспомогательный метод для предварительной валидации набора норм.
+    /// </summary>
     [HttpPost("validate")]
     public IActionResult ValidateLimits([FromBody] UpsertWireCodeLimitsRequest request)
     {

@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Persistence;
 
+/// <summary>
+/// Основной контекст базы данных приложения.
+/// Отвечает за маппинг доменных сущностей на таблицы SQL Server и настройку связей между ними.
+/// </summary>
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
     public DbSet<Role> Roles => Set<Role>();
@@ -20,10 +24,14 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<Reject> Rejects => Set<Reject>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
+    /// <summary>
+    /// Настройка моделей и связей Fluent API.
+    /// </summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Глобальная настройка RowVersion для всех сущностей, наследующих BaseEntity
         ConfigureRowVersion(modelBuilder);
 
         modelBuilder.Entity<Role>(e =>
@@ -41,7 +49,9 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             e.Property(x => x.Login).HasMaxLength(128).IsRequired();
             e.Property(x => x.PasswordHash).HasMaxLength(512);
             e.HasIndex(x => x.Login).IsUnique();
+            // Запрет удаления роли, если есть привязанные пользователи
             e.HasOne(x => x.Role).WithMany(x => x.Users).HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
+            // При удалении лаборатории пользователь остается, но поле LaboratoryId зануляется
             e.HasOne(x => x.Laboratory).WithMany(x => x.Users).HasForeignKey(x => x.LaboratoryId).OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -88,6 +98,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             e.Property(x => x.MinValue).HasPrecision(18, 4);
             e.Property(x => x.MaxValue).HasPrecision(18, 4);
             e.Property(x => x.IsRequired).HasDefaultValue(true);
+            // Уникальный индекс: один параметр для одного шифра настраивается только один раз
             e.HasIndex(x => new { x.WireCodeId, x.ParameterId }).IsUnique();
             e.HasOne(x => x.WireCode).WithMany(x => x.Limits).HasForeignKey(x => x.WireCodeId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Parameter).WithMany(x => x.Limits).HasForeignKey(x => x.ParameterId).OnDelete(DeleteBehavior.Restrict);

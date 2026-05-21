@@ -582,6 +582,7 @@ export default function AdminPage() {
               </Space>
             )
           },
+          /*
           {
             key: "maintenance",
             label: "Обслуживание",
@@ -617,7 +618,7 @@ export default function AdminPage() {
                 </Space>
               </Card>
             )
-          }
+          }*/
         ]}
       />
 

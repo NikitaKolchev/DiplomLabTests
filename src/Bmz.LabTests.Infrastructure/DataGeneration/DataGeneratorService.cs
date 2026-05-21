@@ -9,10 +9,18 @@ using System.Globalization;
 
 namespace Bmz.LabTests.Infrastructure.DataGeneration;
 
+/// <summary>
+/// Сервис автоматической генерации тестовых данных.
+/// Предназначен для наполнения базы данных реалистичными результатами испытаний для демонстрации и нагрузочного тестирования.
+/// </summary>
 public sealed class DataGeneratorService(ApplicationDbContext dbContext) : IDataGeneratorService
 {
     private static readonly Random Random = new();
 
+    /// <summary>
+    /// Генерирует массив случайных испытаний, распределенных по времени, лаборантам и маркам продукции.
+    /// Имитирует нормальное распределение значений параметров и случайные случаи брака.
+    /// </summary>
     public async Task<Result<int>> GenerateTestResultsAsync(int count, CancellationToken cancellationToken)
     {
         try

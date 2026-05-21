@@ -7,6 +7,10 @@ using System.Text.Json;
 
 namespace Bmz.LabTests.LoadTests.Scenarios;
 
+/// <summary>
+/// Сценарий "Создание протокола".
+/// Моделирует процесс регистрации нового испытания в системе.
+/// </summary>
 public static class WriteScenario
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -14,11 +18,15 @@ public static class WriteScenario
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Создает конфигурацию сценария.
+    /// Модель нагрузки: Inject (3 новых пользователя/запроса в секунду).
+    /// </summary>
     public static ScenarioProps Build(HttpClient httpClient, string token)
     {
         return Scenario.Create("СозданиеПротокола", async context =>
         {
-            // Шаг 1: получить список доступных кодов проволоки.
+            // Шаг 1: Получение справочника шифров проволоки для выбора.
             var wireCodesStep = await Step.Run<List<WireCodeDto>>("Список кодов проволоки", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.WireCodes());
@@ -33,7 +41,7 @@ public static class WriteScenario
             if (wireCodes == null || wireCodes.Count == 0)
                 return Response.Ok(statusCode: "нет-кодов");
 
-            // Шаг 2: получить список заказчиков.
+            // Шаг 2: Получение справочника заказчиков.
             var customersStep = await Step.Run<List<CustomerDto>>("Список заказчиков", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.Customers());
@@ -48,7 +56,7 @@ public static class WriteScenario
             var wireCode = wireCodes[Random.Shared.Next(0, wireCodes.Count)];
             var customerId = (customers == null || customers.Count == 0) ? (int?)null : customers[Random.Shared.Next(0, customers.Count)].Id;
 
-            // Шаг 3: создать новый протокол.
+            // Шаг 3: Создание протокола с уникальным BatchNumber (префикс LOAD-).
             var createStep = await Step.Run<CreatedTestResultDto>("Создание протокола", context, async () =>
             {
                 var dto = new CreateTestResultRequest

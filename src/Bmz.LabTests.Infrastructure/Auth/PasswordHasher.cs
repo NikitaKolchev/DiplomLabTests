@@ -4,8 +4,16 @@ using System.Security.Cryptography;
 
 namespace Bmz.LabTests.Infrastructure.Auth;
 
+/// <summary>
+/// Сервис для безопасного хеширования паролей.
+/// Использует алгоритм PBKDF2 с солью для защиты от атак по словарю и радужных таблиц.
+/// </summary>
 public sealed class PasswordHasher : IPasswordHasher
 {
+    /// <summary>
+    /// Создает криптографически стойкий хеш пароля.
+    /// Результат возвращается в формате "соль.хеш" (Base64).
+    /// </summary>
     public string Hash(string password)
     {
         Span<byte> salt = stackalloc byte[16];

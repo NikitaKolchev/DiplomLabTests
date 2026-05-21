@@ -6,10 +6,18 @@ using Bmz.LabTests.Domain.Entities;
 
 namespace Bmz.LabTests.Application.Protocol;
 
+/// <summary>
+/// Сервис управления протоколами и нормами испытаний.
+/// Отвечает за настройку схем ввода и допустимых границ параметров для каждой марки проволоки.
+/// </summary>
 public sealed class ProtocolService(
     IProtocolRepository repository,
     IAuditService auditService) : IProtocolService
 {
+    /// <summary>
+    /// Формирует динамическую схему полей ввода для конкретной марки проволоки.
+    /// Используется фронтендом для построения формы внесения результатов испытаний.
+    /// </summary>
     public async Task<Result<WireCodeInputSchemaDto>> GetInputSchemaAsync(int wireCodeId, CancellationToken cancellationToken)
     {
         try
@@ -43,6 +51,9 @@ public sealed class ProtocolService(
         }
     }
 
+    /// <summary>
+    /// Возвращает список всех настроенных норм (лимитов) для указанной марки проволоки.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<LimitDto>>> GetLimitsAsync(int wireCodeId, CancellationToken cancellationToken)
     {
         try
@@ -75,6 +86,10 @@ public sealed class ProtocolService(
         }
     }
 
+    /// <summary>
+    /// Полностью перезаписывает список норм для марки проволоки.
+    /// Выполняется в рамках одной транзакции: старые нормы удаляются, новые добавляются.
+    /// </summary>
     public async Task<Result> ReplaceLimitsAsync(int actorUserId, string? actorLogin, int wireCodeId, IReadOnlyCollection<LimitUpsertItemDto> items, CancellationToken cancellationToken)
     {
         try

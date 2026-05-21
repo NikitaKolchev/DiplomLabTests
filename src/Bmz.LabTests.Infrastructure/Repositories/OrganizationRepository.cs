@@ -6,27 +6,49 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Repositories;
 
+/// <summary>
+/// Репозиторий для управления структурой организации и пользователями.
+/// Работает с пользователями, ролями и лабораториями.
+/// </summary>
 public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOrganizationRepository
 {
+    /// <summary>
+    /// Получает роль по ее названию.
+    /// </summary>
     public Task<Role?> GetRoleByNameAsync(string roleName, CancellationToken cancellationToken)
         => dbContext.Roles.FirstOrDefaultAsync(x => x.Name == roleName, cancellationToken);
 
+    /// <summary>
+    /// Получает пользователя по ID с загрузкой его роли.
+    /// </summary>
     public Task<User?> GetUserByIdAsync(int userId, CancellationToken cancellationToken)
         => dbContext.Users.Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
+    /// <summary>
+    /// Получает пользователя по логину.
+    /// </summary>
     public Task<User?> GetUserByLoginAsync(string login, CancellationToken cancellationToken)
         => dbContext.Users.Include(x => x.Role).FirstOrDefaultAsync(x => x.Login == login, cancellationToken);
 
+    /// <summary>
+    /// Получает профиль инженера по ID.
+    /// </summary>
     public Task<User?> GetEngineerByIdAsync(int userId, CancellationToken cancellationToken)
         => dbContext.Users
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Id == userId && x.Role.Name == Roles.Engineer, cancellationToken);
 
+    /// <summary>
+    /// Получает профиль ассистента по ID.
+    /// </summary>
     public Task<User?> GetAssistantByIdAsync(int userId, CancellationToken cancellationToken)
         => dbContext.Users
             .Include(x => x.Role)
             .FirstOrDefaultAsync(x => x.Id == userId && x.Role.Name == Roles.Assistant, cancellationToken);
 
+    /// <summary>
+    /// Возвращает список всех инженеров.
+    /// </summary>
     public Task<List<User>> GetEngineersAsync(CancellationToken cancellationToken)
         => dbContext.Users
             .AsNoTracking()
@@ -35,6 +57,9 @@ public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOr
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Возвращает список ассистентов, работающих в той же лаборатории, что и указанный инженер.
+    /// </summary>
     public async Task<List<User>> GetAssistantsForEngineerAsync(int engineerUserId, string? search, string? login, CancellationToken cancellationToken)
     {
         var engineer = await dbContext.Users
@@ -65,6 +90,9 @@ public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOr
         return await query.OrderBy(x => x.FullName).ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Возвращает список всех лабораторий с загрузкой списка пользователей.
+    /// </summary>
     public Task<List<Laboratory>> GetLaboratoriesAsync(CancellationToken cancellationToken)
         => dbContext.Laboratories
             .AsNoTracking()
@@ -73,21 +101,36 @@ public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOr
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Получает данные лаборатории по ID.
+    /// </summary>
     public Task<Laboratory?> GetLaboratoryByIdAsync(int laboratoryId, CancellationToken cancellationToken)
         => dbContext.Laboratories
             .Include(x => x.Users)
                 .ThenInclude(u => u.Role)
             .FirstOrDefaultAsync(x => x.Id == laboratoryId, cancellationToken);
 
+    /// <summary>
+    /// Добавляет нового пользователя.
+    /// </summary>
     public Task AddUserAsync(User user, CancellationToken cancellationToken)
         => dbContext.Users.AddAsync(user, cancellationToken).AsTask();
 
+    /// <summary>
+    /// Добавляет новую роль.
+    /// </summary>
     public Task AddRoleAsync(Role role, CancellationToken cancellationToken)
         => dbContext.Roles.AddAsync(role, cancellationToken).AsTask();
 
+    /// <summary>
+    /// Добавляет новую лабораторию.
+    /// </summary>
     public Task AddLaboratoryAsync(Laboratory laboratory, CancellationToken cancellationToken)
         => dbContext.Laboratories.AddAsync(laboratory, cancellationToken).AsTask();
 
+    /// <summary>
+    /// Проверяет, закреплен ли инженер за другой лабораторией.
+    /// </summary>
     public Task<bool> IsEngineerAssignedToAnotherLaboratoryAsync(int engineerId, int? excludingLaboratoryId, CancellationToken cancellationToken)
         => dbContext.Users
             .AnyAsync(x => x.Id == engineerId 
@@ -96,9 +139,15 @@ public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOr
                         && (!excludingLaboratoryId.HasValue || x.LaboratoryId != excludingLaboratoryId.Value), 
                 cancellationToken);
 
+    /// <summary>
+    /// Сохраняет изменения в БД.
+    /// </summary>
     public Task SaveChangesAsync(CancellationToken cancellationToken)
         => dbContext.SaveChangesAsync(cancellationToken);
 
+    /// <summary>
+    /// Возвращает список всех ассистентов в системе.
+    /// </summary>
     public Task<List<User>> GetAssistantsAsync(CancellationToken cancellationToken)
         => dbContext.Users
             .AsNoTracking()
@@ -108,10 +157,19 @@ public sealed class OrganizationRepository(ApplicationDbContext dbContext) : IOr
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
 
+    /// <summary>
+    /// Удаляет пользователя из контекста.
+    /// </summary>
     public void RemoveUser(User user) => dbContext.Users.Remove(user);
 
+    /// <summary>
+    /// Удаляет лабораторию из контекста.
+    /// </summary>
     public void RemoveLaboratory(Laboratory laboratory) => dbContext.Laboratories.Remove(laboratory);
 
+    /// <summary>
+    /// Отвязывает всех пользователей от указанной лаборатории (устанавливает LaboratoryId = null).
+    /// </summary>
     public async Task ClearLaboratoryFromUsersAsync(int laboratoryId, CancellationToken cancellationToken)
     {
         var users = await dbContext.Users.Where(x => x.LaboratoryId == laboratoryId).ToListAsync(cancellationToken);

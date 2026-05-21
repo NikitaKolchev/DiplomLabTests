@@ -1,7 +1,16 @@
 namespace Bmz.LabTests.Application;
 
+/// <summary>
+/// Утилиты для работы с пользователями.
+/// </summary>
 public static partial class UserUtils
 {
+    /// <summary>
+    /// Транслитерирует кириллический текст в латиницу.
+    /// Используется для автоматической генерации логинов из ФИО.
+    /// </summary>
+    /// <param name="text">Исходный текст на русском языке.</param>
+    /// <returns>Текст на латинице с заменой пробелов на точки.</returns>
     public static string Transliterate(string text)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -19,9 +28,13 @@ public static partial class UserUtils
         };
 
         var transliterated = string.Concat(text.Select(c => map.TryGetValue(c.ToString(), out var replacement) ? replacement : c.ToString()));
+        // Убираем пробелы и заменяем их на точки для формирования логина вида "ivanov.i.i"
         return System.Text.RegularExpressions.Regex.Replace(transliterated.Replace(" ", "."), "\\s+", "");
     }
 
+    /// <summary>
+    /// Генерирует случайный пароль заданной длины.
+    /// </summary>
     public static string GeneratePassword(int length = 10)
     {
         const string charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";

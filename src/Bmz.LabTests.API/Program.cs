@@ -14,17 +14,27 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
 
+/// <summary>
+/// Точка входа в приложение API.
+/// Настраивает сервисы, аутентификацию, CORS, логирование и конвейер обработки запросов.
+/// </summary>
 var builder = WebApplication.CreateBuilder(args);
 
 const string CorsPolicyName = "Frontend";
 
+// --- Настройка сервисов (DI) ---
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+// Настройка автоматической валидации через FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Регистрация слоев приложения и инфраструктуры
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// --- Настройка JWT аутентификации ---
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Параметры JWT не настроены.");
 
@@ -46,6 +56,8 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+// --- Настройка CORS (Cross-Origin Resource Sharing) ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName, policy =>
@@ -57,6 +69,7 @@ builder.Services.AddCors(options =>
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        // По умолчанию для разработки разрешаем Vite-сервер
         if (allowedOrigins.Length == 0 && builder.Environment.IsDevelopment())
         {
             allowedOrigins =
@@ -75,11 +88,15 @@ builder.Services.AddCors(options =>
     });
 });
 
+// --- Настройка Health Checks (мониторинг состояния) ---
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>("database", tags: ["db", "sql"]);
 
 var app = builder.Build();
 
+// --- Конфигурация конвейера обработки (Middleware) ---
+
+// Эндпоинт для проверки здоровья (Health Check)
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = async (context, report) =>
@@ -99,16 +116,19 @@ app.MapHealthChecks("/health", new HealthCheckOptions
     }
 });
 
+// "Живой" эндпоинт для Kubernetes/Docker (без проверки БД)
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
 });
 
+// Включаем спецификацию OpenAPI только в режиме разработки
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
+// Автоматический запуск сидеров (Seeding) базы данных при старте
 using (var scope = app.Services.CreateScope())
 {
     var seeder = scope.ServiceProvider.GetRequiredService<IDatabaseSeeder>();
@@ -116,6 +136,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+// Глобальный обработчик исключений (возвращает Error DTO вместо StackTrace)
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();

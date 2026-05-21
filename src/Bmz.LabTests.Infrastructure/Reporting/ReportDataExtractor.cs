@@ -26,6 +26,10 @@ public sealed record LabStatItem(string Name, int Completed, int Rejected);
 
 public sealed record WireStatItem(string Code, int Completed, int Rejected);
 
+/// <summary>
+/// Промежуточный сервис для извлечения и подготовки данных для PDF-отчетов.
+/// Оптимизирует выборку данных из БД перед передачей в генератор документов.
+/// </summary>
 public sealed class ReportDataExtractor
 {
     private readonly Persistence.ApplicationDbContext _dbContext;
@@ -35,6 +39,9 @@ public sealed class ReportDataExtractor
         _dbContext = dbContext;
     }
 
+    /// <summary>
+    /// Собирает упрощенный набор данных для базовой версии PDF-отчета.
+    /// </summary>
     public async Task<StatisticsPdfData> ExtractStatisticsDataAsync(
         DateTime fromUtc,
         DateTime toUtc,

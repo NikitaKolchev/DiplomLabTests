@@ -1,5 +1,8 @@
 namespace Bmz.LabTests.Infrastructure.Auth;
 
+/// <summary>
+/// Параметры подключения к серверу Active Directory (LDAP).
+/// </summary>
 public sealed class LdapOptions
 {
     public const string SectionName = "Ldap";

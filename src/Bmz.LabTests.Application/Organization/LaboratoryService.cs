@@ -6,10 +6,17 @@ using Bmz.LabTests.Domain.Entities;
 
 namespace Bmz.LabTests.Application.Organization;
 
+/// <summary>
+/// Сервис для управления лабораториями (подразделениями).
+/// Обеспечивает операции создания, обновления и удаления лабораторий, а также управление персоналом (назначение инженеров).
+/// </summary>
 public sealed class LaboratoryService(
     IOrganizationRepository repository,
     IAuditService auditService) : ILaboratoryService
 {
+    /// <summary>
+    /// Возвращает список всех лабораторий с информацией о закрепленных инженерах.
+    /// </summary>
     public async Task<Result<IReadOnlyCollection<LaboratorySummaryDto>>> GetLaboratoriesAsync(CancellationToken cancellationToken)
     {
         try
@@ -27,6 +34,9 @@ public sealed class LaboratoryService(
         }
     }
 
+    /// <summary>
+    /// Создает новую лабораторию и опционально назначает в нее инженера.
+    /// </summary>
     public async Task<Result<LaboratorySummaryDto>> CreateLaboratoryAsync(int actorUserId, string? actorLogin, string name, int? engineerId, CancellationToken cancellationToken)
     {
         try
@@ -70,6 +80,9 @@ public sealed class LaboratoryService(
         }
     }
 
+    /// <summary>
+    /// Назначает инженера ответственным за указанную лабораторию.
+    /// </summary>
     public async Task<Result<LaboratorySummaryDto>> AssignEngineerAsync(int actorUserId, string? actorLogin, int laboratoryId, int engineerId, CancellationToken cancellationToken)
     {
         try
@@ -110,6 +123,9 @@ public sealed class LaboratoryService(
         }
     }
 
+    /// <summary>
+    /// Обновляет данные лаборатории (название и ответственного инженера).
+    /// </summary>
     public async Task<Result<LaboratorySummaryDto>> UpdateLaboratoryAsync(int actorUserId, string? actorLogin, int id, string name, int? engineerId, CancellationToken cancellationToken)
     {
         try
@@ -163,6 +179,9 @@ public sealed class LaboratoryService(
         }
     }
 
+    /// <summary>
+    /// Удаляет лабораторию из системы и отвязывает от нее персонал.
+    /// </summary>
     public async Task<Result> DeleteLaboratoryAsync(int actorUserId, string? actorLogin, int id, CancellationToken cancellationToken)
     {
         try

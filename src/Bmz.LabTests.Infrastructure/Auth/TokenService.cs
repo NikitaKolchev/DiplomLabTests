@@ -8,10 +8,17 @@ using System.Text;
 
 namespace Bmz.LabTests.Infrastructure.Auth;
 
+/// <summary>
+/// Сервис генерации JWT токенов доступа.
+/// Формирует полезную нагрузку токена (claims) на основе данных пользователя.
+/// </summary>
 public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _options = options.Value;
 
+    /// <summary>
+    /// Генерирует подписанный JWT токен со сроком действия, настроенным в конфигурации.
+    /// </summary>
     public (string Token, DateTime ExpiresAtUtc) GenerateToken(User user)
     {
         var now = DateTime.UtcNow;

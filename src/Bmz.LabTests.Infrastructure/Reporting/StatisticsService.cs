@@ -6,6 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
+/// <summary>
+/// Сервис для расчета аналитических показателей и формирования статистики.
+/// Выполняет сложные агрегатные запросы к базе данных для оценки качества продукции и эффективности работы лабораторий.
+/// </summary>
 public sealed class StatisticsService(ApplicationDbContext dbContext) : IStatisticsService
 {
     private sealed record ViolationCandidate(
@@ -16,6 +20,10 @@ public sealed class StatisticsService(ApplicationDbContext dbContext) : IStatist
         string ParameterName,
         string? Unit);
 
+    /// <summary>
+    /// Собирает полную статистику за период: общие KPI, срезы по подразделениям, маркам проволоки, 
+    /// причины брака и динамику испытаний.
+    /// </summary>
     public async Task<Result<StatisticsResponseDto>> GetAsync(
         DateTime fromUtc,
         DateTime toUtc,

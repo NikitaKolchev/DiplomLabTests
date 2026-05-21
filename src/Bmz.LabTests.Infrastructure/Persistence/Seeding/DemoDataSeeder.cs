@@ -7,6 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Persistence.Seeding;
 
+/// <summary>
+/// Инициализатор демонстрационных данных для среды разработки.
+/// Наполняет базу данных примерами лабораторий, марок продукции, норм и результатов испытаний.
+/// </summary>
 public sealed class DemoDataSeeder(IPasswordHasher passwordHasher) : IEntitySeeder
 {
     private const string DemoUserPassword = "VeryHardPassword";
@@ -70,6 +74,9 @@ public sealed class DemoDataSeeder(IPasswordHasher passwordHasher) : IEntitySeed
         ("Несоответствие партии документам", 0.09)
     };
 
+    /// <summary>
+    /// Создает демонстрационные данные, если приложение запущено в режиме Development.
+    /// </summary>
     public async Task<Result> SeedAsync(ApplicationDbContext context, CancellationToken cancellationToken)
     {
         try

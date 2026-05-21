@@ -3,6 +3,9 @@ using Bmz.LabTests.Domain.Constants;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность лаборатории (цеха или подразделения), в которой проводятся испытания.
+/// </summary>
 public sealed class Laboratory : BaseEntity
 {
     public string Name { get; set; } = string.Empty;

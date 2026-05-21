@@ -3,13 +3,20 @@ using Bmz.LabTests.Domain.Enums;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность протокола испытаний (результат испытания).
+/// Является центральной сущностью системы, агрегирующей значения измерений для конкретной партии проволоки.
+/// </summary>
 public sealed class TestResult : BaseEntity
 {
     private readonly List<TestValue> _values = new();
 
-    // EF requirement
+    // Требование Entity Framework Core для создания экземпляра
     private TestResult() { }
 
+    /// <summary>
+    /// Конструктор для создания нового протокола в статусе "В процессе".
+    /// </summary>
     public TestResult(
         int assistantId,
         int wireCodeId,
@@ -20,6 +27,9 @@ public sealed class TestResult : BaseEntity
     {
     }
 
+    /// <summary>
+    /// Полный конструктор для инициализации всех полей (используется при загрузке или миграции).
+    /// </summary>
     public TestResult(
         DateTime date,
         DateTime updatedAtUtc,
@@ -70,6 +80,11 @@ public sealed class TestResult : BaseEntity
 
     public Reject? Reject { get; private set; }
 
+    /// <summary>
+    /// Добавляет новое или обновляет существующее значение измерения.
+    /// </summary>
+    /// <param name="parameterId">Идентификатор параметра.</param>
+    /// <param name="value">Строковое представление значения.</param>
     public void AddOrUpdateValue(int parameterId, string value)
     {
         if (Status == TestResultStatus.Completed)
@@ -90,6 +105,9 @@ public sealed class TestResult : BaseEntity
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Завершает процесс испытаний. После вызова изменения значений запрещены.
+    /// </summary>
     public void Complete()
     {
         if (Status == TestResultStatus.Completed)

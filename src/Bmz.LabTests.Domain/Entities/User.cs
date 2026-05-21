@@ -2,6 +2,10 @@ using Bmz.LabTests.Domain.Common;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность пользователя системы.
+/// Поддерживает как локальные учетные записи, так и доменную авторизацию (через Sid).
+/// </summary>
 public sealed class User : BaseEntity
 {
     public string Sid { get; set; } = string.Empty;

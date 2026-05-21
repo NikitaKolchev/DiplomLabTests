@@ -8,6 +8,11 @@ using System.Text.Json;
 
 namespace Bmz.LabTests.LoadTests.Scenarios;
 
+/// <summary>
+/// Сценарий "Внесение данных".
+/// Моделирует работу лаборанта, который выбирает протоколы со статусом InProgress и вносит в них результаты измерений.
+/// Учитывает оптимистичную блокировку через RowVersion.
+/// </summary>
 public static class UpdateScenario
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -15,11 +20,15 @@ public static class UpdateScenario
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Создает конфигурацию сценария.
+    /// Модель нагрузки: Inject (5 новых запросов в секунду).
+    /// </summary>
     public static ScenarioProps Build(HttpClient httpClient, string token)
     {
         return Scenario.Create("ВнесениеДанных", async context =>
         {
-            // Шаг 1: GET /api/testresults?status=InProgress&pageSize=50 — получить протоколы в работе.
+            // Шаг 1: Получение списка протоколов, которые сейчас находятся в статусе "В работе".
             var inProgressStep = await Step.Run<PaginatedListDto<TestResultListItemDto>>("Протоколы в работе", context, async () =>
             {
                 var url = LoadTestEndpoints.TestResultsList(page: 1, pageSize: 50, status: "InProgress");
@@ -36,10 +45,10 @@ public static class UpdateScenario
             if (listDto == null || listDto.Items.Count == 0)
                 return Response.Ok(statusCode: "нет-в-работе");
 
-            // Шаг 2: выбрать случайный протокол из списка.
+            // Шаг 2: Выбор случайного протокола для обновления.
             var picked = listDto.Items[Random.Shared.Next(0, listDto.Items.Count)];
 
-            // Шаг 3: GET /api/testresults/{id} — получить детали и актуальный RowVersion.
+            // Шаг 3: Получение текущего состояния протокола и актуального RowVersion (обязательно для PUT).
             var detailsStep = await Step.Run<TestResultDetailsDto>("Получение деталей", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.TestResultById(picked.Id));
@@ -52,7 +61,7 @@ public static class UpdateScenario
 
             var details = detailsStep.Payload.Value;
 
-            // Шаг 4: GET /api/parameters — получить список параметров измерений.
+            // Шаг 4: Получение справочника параметров (для информации).
             var parametersStep = await Step.Run<List<ParameterDto>>("Список параметров", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.Parameters());
@@ -63,7 +72,7 @@ public static class UpdateScenario
             if (parametersStep.IsError)
                 return (IResponse)parametersStep;
 
-            // Дополнительный шаг: получить схему ввода для генерации корректных данных.
+            // Дополнительный шаг: Получение схемы полей ввода для конкретного шифра проволоки.
             var schemaStep = await Step.Run<WireCodeInputSchemaDto>("Схема ввода", context, async () =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, LoadTestEndpoints.InputFields(details.WireCodeId));
@@ -78,7 +87,7 @@ public static class UpdateScenario
             if (schema == null || schema.Fields.Count == 0)
                 return Response.Ok(statusCode: "нет-схемы");
 
-            // Шаг 5: PUT /api/testresults/{id}/values — отправить случайные значения для каждого параметра.
+            // Шаг 5: Сохранение сгенерированных случайных значений (PUT /api/testresults/{id}/values).
             var saveStep = await Step.Run<object>("Сохранение значений", context, async () =>
             {
                 var payload = new SaveTestValuesRequest
@@ -93,6 +102,7 @@ public static class UpdateScenario
                 };
                 NbomberHttpHelper.SetBearer(request, token);
 
+                // Используем специальный хелпер, который не считает HTTP 409 (конфликт версий) ошибкой.
                 return await NbomberHttpHelper.SendAsyncTreat409AsOk(httpClient, request, CancellationToken.None);
             });
 

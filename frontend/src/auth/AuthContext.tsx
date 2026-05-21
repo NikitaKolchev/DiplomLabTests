@@ -1,3 +1,7 @@
+/**
+ * Контекст аутентификации.
+ * Управляет состоянием авторизации пользователя (токен, роль, имя) во всем приложении.
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { http, setUnauthorizedHandler } from "../api/http";
 import { clearAccessToken, getAccessToken, saveAccessToken } from "./tokenStorage";
@@ -20,6 +24,9 @@ type AuthContextValue = AuthState & {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Получает начальное состояние авторизации из локального хранилища (localStorage).
+ */
 function getInitialState(): AuthState {
   const token = getAccessToken();
   return {
@@ -33,6 +40,10 @@ function getInitialState(): AuthState {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(getInitialState);
+
+  /**
+   * Сбрасывает состояние авторизации (выход).
+   */
   const resetAuth = useCallback(() => {
     clearAccessToken();
     setState({
@@ -44,6 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  /**
+   * Запрашивает актуальную информацию о текущем пользователе с сервера.
+   */
   const refreshMe = useCallback(async () => {
     const token = getAccessToken();
     if (!token) return;
@@ -57,14 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         laboratoryName: res.data.laboratoryName ?? null
       }));
     } catch {
-      // ignore
+      // Игнорируем ошибки (например, если сервер недоступен)
     }
   }, []);
 
+  // Обновляем данные пользователя при каждом изменении токена
   useEffect(() => {
     if (state.token) void refreshMe();
   }, [state.token, refreshMe]);
 
+  // Устанавливаем глобальный перехватчик 401 ошибки для разлогина
   useEffect(() => {
     setUnauthorizedHandler(() => {
       resetAuth();
@@ -76,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return {
       ...state,
       isAuthenticated: !!state.token,
+      /**
+       * Выполняет вход: сохраняет токен и обновляет состояние.
+       */
       login: (token: string) => {
         saveAccessToken(token);
         setState({
@@ -96,6 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/**
+ * Хук для использования контекста аутентификации в компонентах.
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

@@ -4,13 +4,23 @@ using Bmz.LabTests.Infrastructure.Persistence;
 
 namespace Bmz.LabTests.Infrastructure.Reporting;
 
+/// <summary>
+/// Сервис генерации отчетов.
+/// Объединяет функционал создания Excel-журналов и PDF-сертификатов качества.
+/// </summary>
 public sealed class ReportService(
     ExcelReportGenerator excelGenerator,
     PdfReportGenerator pdfGenerator) : IReportService
 {
+    /// <summary>
+    /// Формирует ежемесячный журнал испытаний в формате Excel.
+    /// </summary>
     public Task<Result<ReportFile>> GenerateMonthlyJournalExcelAsync(int year, int month, CancellationToken cancellationToken)
         => excelGenerator.GenerateMonthlyJournalExcelAsync(year, month, cancellationToken);
 
+    /// <summary>
+    /// Формирует детальный журнал испытаний с фильтрацией по периоду, лаборатории и продукции.
+    /// </summary>
     public Task<Result<ReportFile>> GenerateDetailedJournalExcelAsync(
         DateTime fromUtc,
         DateTime toUtc,
@@ -19,6 +29,9 @@ public sealed class ReportService(
         CancellationToken cancellationToken)
         => excelGenerator.GenerateDetailedJournalExcelAsync(fromUtc, toUtc, laboratoryId, wireCodeId, cancellationToken);
 
+    /// <summary>
+    /// Генерирует отчет по статистике испытаний в формате PDF.
+    /// </summary>
     public Task<Result<ReportFile>> GenerateStatisticsPdfAsync(
         DateTime fromUtc,
         DateTime toUtc,
@@ -27,6 +40,9 @@ public sealed class ReportService(
         CancellationToken cancellationToken)
         => pdfGenerator.GenerateStatisticsPdfAsync(fromUtc, toUtc, laboratoryId, groupBy, null, cancellationToken);
 
+    /// <summary>
+    /// Генерирует расширенный статистический отчет с графиками и диаграммами.
+    /// </summary>
     public Task<Result<ReportFile>> GenerateStatisticsPdfWithChartsAsync(
         DateTime fromUtc,
         DateTime toUtc,
@@ -36,6 +52,9 @@ public sealed class ReportService(
         CancellationToken cancellationToken)
         => pdfGenerator.GenerateStatisticsPdfAsync(fromUtc, toUtc, laboratoryId, groupBy, statistics, cancellationToken);
 
+    /// <summary>
+    /// Создает официальный сертификат (протокол) испытаний конкретной партии в PDF.
+    /// </summary>
     public Task<Result<ReportFile>> GenerateBatchCertificatePdfAsync(int testResultId, CancellationToken cancellationToken)
         => pdfGenerator.GenerateBatchCertificatePdfAsync(testResultId, cancellationToken);
 }

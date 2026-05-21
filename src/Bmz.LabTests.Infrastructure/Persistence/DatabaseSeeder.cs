@@ -5,10 +5,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Bmz.LabTests.Infrastructure.Persistence;
 
+/// <summary>
+/// Главный сервис инициализации базы данных.
+/// Выполняет автоматическое применение миграций и последовательный запуск всех наполнителей (seeders) начальными данными.
+/// </summary>
 public sealed class DatabaseSeeder(
     ApplicationDbContext context,
     IEnumerable<IEntitySeeder> seeders) : IDatabaseSeeder
 {
+    /// <summary>
+    /// Запускает процесс миграции и наполнения БД.
+    /// Гарантирует, что БД находится в актуальном состоянии перед началом работы приложения.
+    /// </summary>
     public async Task<Result> SeedAsync(CancellationToken cancellationToken = default)
     {
         try

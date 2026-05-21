@@ -1,5 +1,9 @@
 namespace Bmz.LabTests.Domain.Common;
 
+/// <summary>
+/// Шаблон "Result" для обработки результатов операций без использования исключений для ожидаемых ошибок.
+/// Позволяет явно вернуть успех или ошибку из доменного слоя или слоя приложения.
+/// </summary>
 public class Result
 {
     protected Result(bool isSuccess, Error error)
@@ -13,8 +17,13 @@ public class Result
         Error = error;
     }
 
+    /// <summary>Признак успешного завершения операции.</summary>
     public bool IsSuccess { get; }
+
+    /// <summary>Признак того, что операция завершилась ошибкой.</summary>
     public bool IsFailure => !IsSuccess;
+
+    /// <summary>Объект ошибки (доступен только при IsFailure = true).</summary>
     public Error Error { get; }
 
     public static Result Success() => new(true, Error.None);
@@ -26,6 +35,9 @@ public class Result
     public static Result<T> Failure<T>(string message) => Result<T>.Failure(Error.Failure(message));
 }
 
+/// <summary>
+/// Обобщенная версия Result, содержащая возвращаемое значение типа T.
+/// </summary>
 public class Result<T> : Result
 {
     private readonly T? _value;
@@ -36,6 +48,9 @@ public class Result<T> : Result
         _value = value;
     }
 
+    /// <summary>
+    /// Возвращаемое значение. Выбрасывает исключение, если попытаться получить значение при ошибке.
+    /// </summary>
     public T Value => IsSuccess
         ? _value!
         : throw new InvalidOperationException("Нельзя получить значение неуспешного результата.");

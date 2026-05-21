@@ -2,6 +2,10 @@ using Bmz.LabTests.Domain.Common;
 
 namespace Bmz.LabTests.Domain.Entities;
 
+/// <summary>
+/// Сущность "Готовая продукция".
+/// Создается автоматически при успешном завершении протокола, если все параметры соответствуют нормам.
+/// </summary>
 public sealed class FinalProduct : BaseEntity
 {
     private FinalProduct() { }

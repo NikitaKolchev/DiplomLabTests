@@ -4,6 +4,9 @@ using System.Text.Json;
 
 namespace Bmz.LabTests.LoadTests.Http;
 
+/// <summary>
+/// Провайдер для получения JWT токена доступа.
+/// </summary>
 public static class TokenProvider
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -11,6 +14,14 @@ public static class TokenProvider
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// Выполняет вход в систему и возвращает JWT токен.
+    /// Использует учетные данные из <see cref="LoadTestConfig"/>.
+    /// </summary>
+    /// <param name="httpClient">HttpClient для выполнения запроса.</param>
+    /// <param name="cancellationToken">Токен отмены.</param>
+    /// <returns>Строка с JWT токеном.</returns>
+    /// <exception cref="InvalidOperationException">Выбрасывается, если авторизация не удалась.</exception>
     public static async Task<string> GetTokenAsync(HttpClient httpClient, CancellationToken cancellationToken = default)
     {
         var request = new LoginRequest
@@ -35,6 +46,9 @@ public static class TokenProvider
         return payload.Token;
     }
 
+    /// <summary>
+    /// Безопасное чтение тела ответа для вывода в исключение.
+    /// </summary>
     private static async Task<string> SafeReadBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try

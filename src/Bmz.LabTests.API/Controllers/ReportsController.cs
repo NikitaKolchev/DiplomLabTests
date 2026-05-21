@@ -8,6 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Bmz.LabTests.API.Controllers;
 
+/// <summary>
+/// Контроллер для генерации аналитических отчетов и журналов.
+/// Позволяет выгружать данные в форматах Excel (для журналов) и PDF (для статистики и сертификатов).
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = $"{Roles.Admin},{Roles.Engineer}")]
@@ -18,6 +22,10 @@ public sealed class ReportsController(
     ICurrentUserService currentUser,
     IStatisticsService statisticsService) : ApiControllerBase
 {
+    /// <summary>
+    /// Получает доступные фильтры для отчетов (лаборатории и коды проволоки).
+    /// Фильтрует список лабораторий в зависимости от прав текущего пользователя.
+    /// </summary>
     [HttpGet("filters")]
     public async Task<IActionResult> GetReportFilters(CancellationToken cancellationToken)
     {
@@ -48,6 +56,9 @@ public sealed class ReportsController(
         });
     }
 
+    /// <summary>
+    /// Генерирует и возвращает ежемесячный журнал испытаний в формате Excel.
+    /// </summary>
     [HttpGet("monthly-journal")]
     public async Task<IActionResult> MonthlyJournal([FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken)
     {
@@ -61,6 +72,9 @@ public sealed class ReportsController(
         return File(report.Content, report.ContentType, report.FileName);
     }
 
+    /// <summary>
+    /// Генерирует и возвращает детальный журнал испытаний в формате Excel по заданным фильтрам.
+    /// </summary>
     [HttpGet("detailed-journal")]
     public async Task<IActionResult> DetailedJournal(
         [FromQuery] DateTime fromUtc,
@@ -81,6 +95,9 @@ public sealed class ReportsController(
         return File(report.Content, report.ContentType, report.FileName);
     }
 
+    /// <summary>
+    /// Генерирует аналитический отчет со статистикой и графиками в формате PDF.
+    /// </summary>
     [HttpGet("statistics-pdf")]
     public async Task<IActionResult> StatisticsPdf(
         [FromQuery] DateTime fromUtc,
@@ -104,6 +121,9 @@ public sealed class ReportsController(
         return File(report.Content, report.ContentType, report.FileName);
     }
 
+    /// <summary>
+    /// Генерирует сертификат (протокол) качества для конкретного результата испытаний в формате PDF.
+    /// </summary>
     [HttpGet("test-results/{testResultId:int}/certificate")]
     public async Task<IActionResult> Certificate(int testResultId, CancellationToken cancellationToken)
     {
