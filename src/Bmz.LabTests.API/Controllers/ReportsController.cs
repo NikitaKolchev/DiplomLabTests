@@ -14,7 +14,7 @@ namespace Bmz.LabTests.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = $"{Roles.Admin},{Roles.Engineer}")]
+[Authorize(Roles = $"{Roles.Admin},{Roles.Engineer},{Roles.Assistant}")]
 public sealed class ReportsController(
     IReportService reportService,
     ILaboratoryService laboratoryService,
@@ -58,6 +58,7 @@ public sealed class ReportsController(
 
     /// <summary>
     /// Генерирует и возвращает ежемесячный журнал испытаний в формате Excel.
+    /// Для не-админов отчёт формируется только по их лаборатории.
     /// </summary>
     [HttpGet("monthly-journal")]
     public async Task<IActionResult> MonthlyJournal([FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken)
@@ -65,7 +66,10 @@ public sealed class ReportsController(
         if (year is < 2000 or > 2100 || month is < 1 or > 12)
             return BadRequest("Неверный год/месяц.");
 
-        var result = await reportService.GenerateMonthlyJournalExcelAsync(year, month, cancellationToken);
+        var labId = ResolveLaboratoryScope();
+        var from = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = from.AddMonths(1);
+        var result = await reportService.GenerateDetailedJournalExcelAsync(from, to, labId, null, cancellationToken);
         if (result.IsFailure) return ToActionResult(result);
 
         var report = result.Value;
@@ -88,7 +92,7 @@ public sealed class ReportsController(
         if ((toUtc - fromUtc).TotalDays > 365)
             return BadRequest("Диапазон дат не может превышать 365 дней.");
 
-        var result = await reportService.GenerateDetailedJournalExcelAsync(fromUtc, toUtc, laboratoryId, wireCodeId, cancellationToken);
+        var result = await reportService.GenerateDetailedJournalExcelAsync(fromUtc, toUtc, laboratoryId ?? ResolveLaboratoryScope(), wireCodeId, cancellationToken);
         if (result.IsFailure) return ToActionResult(result);
 
         var report = result.Value;
@@ -132,5 +136,16 @@ public sealed class ReportsController(
 
         var report = result.Value;
         return File(report.Content, report.ContentType, report.FileName);
+    }
+
+    /// <summary>
+    /// Определяет лабораторную область видимости для текущего пользователя.
+    /// Администраторы видят все лаборатории (null), остальные — только свою.
+    /// </summary>
+    private int? ResolveLaboratoryScope()
+    {
+        if (string.Equals(currentUser.Role, Roles.Admin, StringComparison.OrdinalIgnoreCase))
+            return null;
+        return currentUser.LaboratoryId;
     }
 }

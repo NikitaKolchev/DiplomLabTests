@@ -34,7 +34,8 @@ public sealed class TokenService(IOptions<JwtOptions> options) : ITokenService
             new(JwtRegisteredClaimNames.UniqueName, user.Login),
             new(JwtRegisteredClaimNames.Name, user.FullName),
             new(ClaimTypes.Role, user.Role.Name),
-            new("sid", user.Sid)
+            new("sid", user.Sid),
+            new("laboratoryId", user.LaboratoryId?.ToString() ?? "")
         };
 
         var token = new JwtSecurityToken(

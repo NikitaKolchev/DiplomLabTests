@@ -210,6 +210,21 @@ public sealed class TestResultService(
             return Result.Failure<SavedTestResultDto>($"Для этого кода проволоки не настроены параметры: {string.Join(", ", notAllowed)}.");
         }
 
+        // Проверка, что все обязательные параметры заполнены
+        var limits = await repository.GetLimitsByWireCodeIdAsync(testResult.WireCodeId, cancellationToken);
+        var requiredParamIds = limits.Where(l => l.IsRequired).Select(l => l.ParameterId).ToHashSet();
+        var submittedValueIds = request.Values
+            .Where(v => requiredParamIds.Contains(v.ParameterId))
+            .ToDictionary(v => v.ParameterId, v => v.Value);
+        var missingRequired = limits
+            .Where(l => l.IsRequired && string.IsNullOrWhiteSpace(submittedValueIds.GetValueOrDefault(l.ParameterId)))
+            .Select(l => l.Parameter.Name)
+            .ToArray();
+        if (missingRequired.Length > 0)
+        {
+            return Result.Failure<SavedTestResultDto>($"Заполните обязательные поля: {string.Join(", ", missingRequired)}.");
+        }
+
         foreach (var value in request.Values)
         {
             testResult.AddOrUpdateValue(value.ParameterId, value.Value);

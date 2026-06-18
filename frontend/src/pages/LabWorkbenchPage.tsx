@@ -54,6 +54,16 @@ export default function LabWorkbenchPage() {
   const [loading, setLoading] = useState(false);
   const canCreateProtocol = auth.role === "Assistant";
 
+  const missingRequiredFieldIds = useMemo(() => {
+    const missing = new Set<number>();
+    for (const field of fields) {
+      if (field.isRequired && !(values[field.parameterId] ?? "").trim()) {
+        missing.add(field.parameterId);
+      }
+    }
+    return missing;
+  }, [fields, values]);
+
   const normalizeStatus = (value: unknown): 1 | 2 => (value === 2 || value === "Completed" ? 2 : 1);
   const statusLabel = (status: 1 | 2) => (status === 2 ? "Завершено" : "В работе");
 
@@ -98,6 +108,10 @@ export default function LabWorkbenchPage() {
 
   const saveValues = async () => {
     if (!protocol) return;
+    if (missingRequiredFieldIds.size > 0) {
+      message.warning("Заполните все обязательные поля перед сохранением");
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -139,7 +153,11 @@ export default function LabWorkbenchPage() {
 
   const columns = useMemo<ColumnsType<InputField>>(
     () => [
-      { title: "Параметр", dataIndex: "parameterName" },
+      {
+        title: "Параметр",
+        dataIndex: "parameterName",
+        render: (v: string, row: InputField) => (row.isRequired ? `${v} *` : v)
+      },
       {
         title: "Тип",
         dataIndex: "dataType",
@@ -172,10 +190,12 @@ export default function LabWorkbenchPage() {
       {
         title: "Значение",
         key: "value",
-        render: (_, row) =>
-          row.dataType === 1 ? (
+        render: (_, row) => {
+          const isError = missingRequiredFieldIds.has(row.parameterId);
+          return row.dataType === 1 ? (
             <InputNumber
               style={{ width: "100%" }}
+              status={isError ? "error" : undefined}
               value={values[row.parameterId] === "" ? null : Number(values[row.parameterId] ?? "")}
               disabled={protocol?.status === 2}
               onChange={(v) =>
@@ -187,6 +207,7 @@ export default function LabWorkbenchPage() {
             />
           ) : (
             <Input
+              status={isError ? "error" : undefined}
               value={values[row.parameterId] ?? ""}
               disabled={protocol?.status === 2}
               onChange={(e) =>
@@ -196,10 +217,11 @@ export default function LabWorkbenchPage() {
                 }))
               }
             />
-          )
+          );
+        }
       }
     ],
-    [values, protocol?.status]
+    [values, protocol?.status, missingRequiredFieldIds]
   );
 
   const loadProtocolById = async (testResultId: number) => {
@@ -338,7 +360,7 @@ export default function LabWorkbenchPage() {
                 type="primary"
                 danger
                 onClick={completeProtocol}
-                disabled={protocol.status === 2}
+                disabled={protocol.status === 2 || missingRequiredFieldIds.size > 0}
                 loading={loading}
               >
                 Завершить протокол

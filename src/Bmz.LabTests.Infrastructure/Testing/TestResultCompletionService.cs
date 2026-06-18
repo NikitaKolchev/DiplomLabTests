@@ -44,29 +44,35 @@ public sealed class TestResultCompletionService(ITestResultRepository repository
 
             // 4. Выполняем валидацию всех параметров
             var valueLookup = testResult.Values.ToDictionary(x => x.ParameterId, x => x.Value);
-            var issues = Validate(limits, valueLookup);
+            var (missingRequired, outOfRange) = Validate(limits, valueLookup);
 
-            // 5. Переводим протокол в статус Completed (замораживаем изменения)
+            // 5. Если не заполнены обязательные поля — блокируем завершение
+            if (missingRequired.Count > 0)
+            {
+                return Result.Failure<CompletionResult>($"Заполните обязательные поля: {string.Join("; ", missingRequired)}");
+            }
+
+            // 6. Переводим протокол в статус Completed (замораживаем изменения)
             testResult.Complete();
 
-            // 6. Формируем результат: если ошибок нет — партия годна, иначе — брак
-            if (issues.Count == 0)
+            // 7. Формируем результат: если ошибок нет — партия годна, иначе — брак
+            if (outOfRange.Count == 0)
             {
                 await repository.AddFinalProductAsync(new FinalProduct(testResultId), cancellationToken);
             }
             else
             {
-                var reason = string.Join("; ", issues);
+                var reason = string.Join("; ", outOfRange);
                 await repository.AddRejectAsync(new Reject(testResultId, reason), cancellationToken);
             }
 
-            // 7. Сохраняем все изменения в одной транзакции
+            // 8. Сохраняем все изменения в одной транзакции
             await repository.SaveChangesAsync(cancellationToken);
 
             return Result.Success(new CompletionResult
             {
-                IsAccepted = issues.Count == 0,
-                RejectReason = issues.Count == 0 ? null : string.Join("; ", issues)
+                IsAccepted = outOfRange.Count == 0,
+                RejectReason = outOfRange.Count == 0 ? null : string.Join("; ", outOfRange)
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -84,9 +90,10 @@ public sealed class TestResultCompletionService(ITestResultRepository repository
     /// Внутренняя логика валидации значений против установленных норм.
     /// Проверяет обязательность заполнения, корректность числовых форматов и вхождение в диапазоны [Min, Max].
     /// </summary>
-    private static List<string> Validate(IReadOnlyCollection<WireCodeLimit> limits, IReadOnlyDictionary<int, string> values)
+    private static (List<string> MissingRequired, List<string> OutOfRange) Validate(IReadOnlyCollection<WireCodeLimit> limits, IReadOnlyDictionary<int, string> values)
     {
-        var issues = new List<string>();
+        var missingRequired = new List<string>();
+        var outOfRange = new List<string>();
         var culture = CultureInfo.InvariantCulture;
 
         foreach (var limit in limits)
@@ -94,10 +101,10 @@ public sealed class TestResultCompletionService(ITestResultRepository repository
             values.TryGetValue(limit.ParameterId, out var rawValue);
             var hasValue = !string.IsNullOrWhiteSpace(rawValue);
 
-            // Проверка обязательности
+            // Проверка обязательности — критическая ошибка
             if (limit.IsRequired && !hasValue)
             {
-                issues.Add($"{limit.Parameter.Name}: значение обязательно.");
+                missingRequired.Add($"{limit.Parameter.Name}: значение обязательно.");
                 continue;
             }
 
@@ -116,23 +123,23 @@ public sealed class TestResultCompletionService(ITestResultRepository repository
             var normalized = rawValue!.Trim().Replace(',', '.');
             if (!decimal.TryParse(normalized, NumberStyles.Number, culture, out var numericValue))
             {
-                issues.Add($"{limit.Parameter.Name}: '{rawValue}' не является корректным числом.");
+                outOfRange.Add($"{limit.Parameter.Name}: '{rawValue}' не является корректным числом.");
                 continue;
             }
 
             // Проверка на выход за нижнюю границу
             if (limit.MinValue.HasValue && numericValue < limit.MinValue.Value)
             {
-                issues.Add($"{limit.Parameter.Name}: {numericValue} меньше {limit.MinValue.Value}.");
+                outOfRange.Add($"{limit.Parameter.Name}: {numericValue} меньше {limit.MinValue.Value}.");
             }
 
             // Проверка на выход за верхнюю границу
             if (limit.MaxValue.HasValue && numericValue > limit.MaxValue.Value)
             {
-                issues.Add($"{limit.Parameter.Name}: {numericValue} больше {limit.MaxValue.Value}.");
+                outOfRange.Add($"{limit.Parameter.Name}: {numericValue} больше {limit.MaxValue.Value}.");
             }
         }
 
-        return issues;
+        return (missingRequired, outOfRange);
     }
 }

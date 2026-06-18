@@ -38,7 +38,7 @@ public sealed class AdminSeeder(IPasswordHasher passwordHasher) : IEntitySeeder
             context.Users.Add(new User
             {
                 Login = LocalAdminLogin,
-                FullName = "Local Admin",
+                FullName = "Администратор",
                 Sid = "LOCAL-ADMIN",
                 IsLocalAccount = true,
                 PasswordHash = passwordHasher.Hash(LocalAdminPassword),
